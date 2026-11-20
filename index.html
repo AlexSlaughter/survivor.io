@@ -2,32 +2,86 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0b0d17">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Horda Nocturna</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <canvas id="game"></canvas>
+  <div id="safeProbe" aria-hidden="true"></div>
 
   <button id="pauseBtn" class="hidden" aria-label="Pausa">❚❚</button>
   <div id="toast" class="hidden"></div>
 
+  <!-- Menú principal -->
   <div id="menu" class="overlay">
     <div class="panel">
+      <div class="topbar">
+        <span class="gold">🪙 <b class="goldAmt">0</b></span>
+        <span class="toggles">
+          <button class="tgl" data-t="sfx" aria-label="Efectos de sonido"></button>
+          <button class="tgl" data-t="music" aria-label="Música"></button>
+        </span>
+      </div>
       <h1>HORDA<br><span>NOCTURNA</span></h1>
       <p class="tag">Sobrevive 10 minutos y derrota al <b>Rey del Abismo</b>.</p>
-      <ul class="help">
-        <li>🎮 Muévete con <b>WASD</b> / <b>flechas</b> o arrastrando el dedo.</li>
-        <li>✨ Tus armas atacan solas. Recoge cristales para subir de nivel.</li>
-        <li>⭐ Lleva un arma a <b>Nv. 5</b>, consigue su objeto clave y abre un <b>cofre</b> de élite para <b>evolucionarla</b>.</li>
-        <li>⏸ <b>P</b> / <b>Esc</b> para pausar.</li>
-      </ul>
-      <button id="playBtn" class="primary">Jugar</button>
+      <div class="stack">
+        <button id="playBtn" class="primary big">Jugar</button>
+        <div class="row2">
+          <button id="shopBtn">🛒 Tienda</button>
+          <button id="helpBtn">❓ Cómo jugar</button>
+        </div>
+      </div>
       <p id="bestTime" class="best"></p>
     </div>
   </div>
 
+  <!-- Ayuda -->
+  <div id="help" class="overlay hidden">
+    <div class="panel">
+      <h2>Cómo jugar</h2>
+      <ul class="help">
+        <li>🎮 Muévete con <b>WASD</b> / <b>flechas</b> o arrastrando el dedo por la pantalla.</li>
+        <li>✨ Tus armas atacan solas. Recoge cristales para subir de nivel y elige mejoras.</li>
+        <li>⭐ Lleva un arma a <b>Nv. 5</b>, consigue su objeto clave y abre un <b>cofre</b> (lo sueltan élites y jefes) para <b>evolucionarla</b>.</li>
+        <li>🪙 Gana oro en cada partida y gástalo en la <b>tienda</b>, en nuevos <b>personajes</b> y desbloquea <b>mapas</b> más difíciles.</li>
+        <li>⏸ <b>P</b> / <b>Esc</b> para pausar. Teclas <b>1-4</b> para elegir mejoras.</li>
+      </ul>
+      <button class="back">Volver</button>
+    </div>
+  </div>
+
+  <!-- Selección de personaje y mapa -->
+  <div id="select" class="overlay hidden">
+    <div class="panel wide">
+      <div class="topbar"><span class="gold">🪙 <b class="goldAmt">0</b></span></div>
+      <h2>Elige personaje</h2>
+      <div id="chars" class="grid"></div>
+      <h2>Elige mapa</h2>
+      <div id="maps" class="grid maps"></div>
+      <div class="actions">
+        <button class="back">Volver</button>
+        <button id="startBtn" class="primary big">¡Comenzar!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tienda -->
+  <div id="shop" class="overlay hidden">
+    <div class="panel wide">
+      <div class="topbar"><span class="gold">🪙 <b class="goldAmt">0</b></span></div>
+      <h2>Tienda</h2>
+      <p class="sub">Mejoras permanentes para todas tus partidas.</p>
+      <div id="shopGrid" class="grid shopgrid"></div>
+      <div class="actions"><button class="back">Volver</button></div>
+    </div>
+  </div>
+
+  <!-- Subida de nivel -->
   <div id="levelup" class="overlay hidden">
     <div class="panel wide">
       <h2>¡Subes de nivel!</h2>
@@ -35,24 +89,39 @@
     </div>
   </div>
 
+  <!-- Pausa -->
   <div id="pause" class="overlay hidden">
     <div class="panel">
+      <div class="topbar">
+        <span></span>
+        <span class="toggles">
+          <button class="tgl" data-t="sfx" aria-label="Efectos de sonido"></button>
+          <button class="tgl" data-t="music" aria-label="Música"></button>
+        </span>
+      </div>
       <h2>Pausa</h2>
       <div id="build"></div>
-      <button id="resumeBtn" class="primary">Continuar</button>
-      <button id="quitBtn">Abandonar</button>
+      <div class="actions">
+        <button id="quitBtn">Abandonar</button>
+        <button id="resumeBtn" class="primary">Continuar</button>
+      </div>
     </div>
   </div>
 
+  <!-- Fin de partida -->
   <div id="end" class="overlay hidden">
     <div class="panel">
       <h2 id="endTitle"></h2>
       <div id="endStats"></div>
-      <button id="retryBtn" class="primary">Jugar otra vez</button>
-      <button id="menuBtn">Menú</button>
+      <div class="actions">
+        <button id="menuBtn">Menú</button>
+        <button id="retryBtn" class="primary">Jugar otra vez</button>
+      </div>
     </div>
   </div>
 
+  <script src="data.js"></script>
+  <script src="audio.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
