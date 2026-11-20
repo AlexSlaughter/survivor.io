@@ -208,7 +208,7 @@
     const ul = id => Math.floor(+up[id] || 0);
     const m = ch.mods;
     const p = {
-      idx, x, y: 0, r: 14, hp: 100, maxHp: 100, inv: 0, face: { x: 1, y: 0 }, side: 1, walk: 0, ch,
+      idx, x, y: 0, r: 14 * (ch.mods.size || 1), hp: 100, maxHp: 100, inv: 0, face: { x: 1, y: 0 }, side: 1, walk: 0, ch,
       color: PCOLORS[idx], down: false, reviveT: 0, revives: ul('renacer'), choices: 3 + ul('vision'),
       stats: { dmg: 1, cd: 1, speed: 1, regen: 0, magnet: 1, area: 1, proj: 0, armor: 0, xp: 1, gold: 1 },
       weapons: [], passives: {},
@@ -217,6 +217,7 @@
     // Personaje
     p.maxHp += m.hp || 0; s.armor += m.armor || 0; s.speed += m.speed || 0; s.magnet += m.magnet || 0;
     s.dmg += m.dmg || 0; s.area += m.area || 0; s.cd *= m.cd || 1; s.regen += m.regen || 0;
+    s.gold += m.gold || 0; s.xp += m.xp || 0;
     // Tienda
     s.dmg += 0.05 * ul('poder');
     p.maxHp += 10 * ul('vida');
@@ -1225,7 +1226,7 @@
     // cuerpo
     if (glow) { ctx.shadowColor = ch.body; ctx.shadowBlur = 16; }
     ctx.fillStyle = ch.body;
-    ctx.beginPath(); ctx.arc(x, y + bob, r, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, y + bob, r * (ch.wide || 1), r, 0, 0, TAU); ctx.fill();
     ctx.shadowBlur = 0;
     // accesorio
     const cy = y + bob;
@@ -1254,6 +1255,34 @@
         ctx.fillStyle = '#ffe14d';
         ctx.beginPath(); ctx.moveTo(x + 2, cy - r - 12); ctx.lineTo(x - 4, cy - r - 3); ctx.lineTo(x, cy - r - 3); ctx.lineTo(x - 2, cy - r + 4); ctx.lineTo(x + 4, cy - r - 6); ctx.lineTo(x, cy - r - 6); ctx.closePath(); ctx.fill();
         break;
+      case 'bucket': {
+        // Un cubo puesto del revés, algo torcido.
+        ctx.save(); ctx.translate(x, cy - r * 0.55); ctx.rotate(-0.18);
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.95, r * 0.15); ctx.lineTo(-r * 0.7, -r * 0.85); ctx.lineTo(r * 0.7, -r * 0.85); ctx.lineTo(r * 0.95, r * 0.15);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = '#6b737c'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(-r * 0.85, -r * 0.2); ctx.lineTo(r * 0.85, -r * 0.2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, -r * 0.85, r * 0.5, Math.PI, 0); ctx.stroke();
+        ctx.restore();
+        break;
+      }
+      case 'viking': {
+        const w = r * (ch.wide || 1);
+        ctx.beginPath(); ctx.ellipse(x, cy - 2, w + 1.5, r + 1, 0, Math.PI, 0); ctx.fill();
+        ctx.fillRect(x - w - 1.5, cy - 3, (w + 1.5) * 2, 3);
+        ctx.fillStyle = '#f2e6c9';
+        ctx.beginPath(); ctx.moveTo(x - w * 0.8, cy - r * 0.6); ctx.quadraticCurveTo(x - w * 1.5, cy - r * 1.1, x - w * 1.25, cy - r * 1.7); ctx.lineTo(x - w * 0.5, cy - r * 0.85); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(x + w * 0.8, cy - r * 0.6); ctx.quadraticCurveTo(x + w * 1.5, cy - r * 1.1, x + w * 1.25, cy - r * 1.7); ctx.lineTo(x + w * 0.5, cy - r * 0.85); ctx.fill();
+        break;
+      }
+      case 'cap': {
+        // Gorra con visera hacia donde mira.
+        const sd = face.side || (face.x >= 0 ? 1 : -1), w = r * (ch.wide || 1);
+        ctx.beginPath(); ctx.ellipse(x, cy - r * 0.35, w + 1, r * 0.75, 0, Math.PI, 0); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(x + sd * w * 0.9, cy - r * 0.38, w * 0.75, r * 0.16, 0, 0, TAU); ctx.fill();
+        break;
+      }
     }
     eyes(x + face.x * r * 0.35, cy + 1 + face.y * 3, r * 0.25);
   }
@@ -2057,7 +2086,7 @@
 
   function viewPlayer(ch, idx, x) {
     return {
-      idx, x, y: 0, px: x, py: 0, tx: x, ty: 0, r: 14, hp: 100, maxHp: 100, inv: 0, face: { x: 1, y: 0 }, side: 1, walk: 0,
+      idx, x, y: 0, px: x, py: 0, tx: x, ty: 0, r: 14 * (ch.mods.size || 1), hp: 100, maxHp: 100, inv: 0, face: { x: 1, y: 0 }, side: 1, walk: 0,
       ch, color: PCOLORS[idx], down: false, reviveT: 0, revives: 0, stats: { speed: 1 }, weapons: [], passives: {},
     };
   }

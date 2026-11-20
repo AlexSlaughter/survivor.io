@@ -77,6 +77,24 @@ window.HN_DATA = {
       desc: '-12% recarga, +1 vida/s.', mods: { cd: 0.88, regen: 1 },
       body: '#f4f0ff', hood: '#2d6bff', cloak: '#1a2a6b', acc: 'spark',
     },
+    {
+      id: 'salim', name: 'Salim', title: 'el Inútil', weapon: 'chispa', cost: 100,
+      desc: '-25% daño, -10% velocidad. La suerte del inútil: +40% oro y +25% experiencia.',
+      mods: { dmg: -0.25, speed: -0.10, gold: 0.40, xp: 0.25 },
+      body: '#d9b48a', hood: '#9aa3ad', cloak: '#5b4a3a', acc: 'bucket',
+    },
+    {
+      id: 'ivan', name: 'Iván', title: 'el Tanque', weapon: 'halo', cost: 700,
+      desc: '+80 vida, +2 armadura, +1 vida/s. Lento (-20%) y grande: le dan más fácil.',
+      mods: { hp: 80, armor: 2, regen: 1, speed: -0.20, size: 1.3 },
+      body: '#e0a46b', hood: '#7b8794', cloak: '#3a2a1a', acc: 'viking', wide: 1.15,
+    },
+    {
+      id: 'pol', name: 'Pol', title: 'el Flaco', weapon: 'chispa', cost: 500,
+      desc: '+30% velocidad, -10% recarga y difícil de alcanzar, pero solo 60 de vida.',
+      mods: { hp: -40, speed: 0.30, cd: 0.90, size: 0.75 },
+      body: '#ffe0b8', hood: '#2bd4a0', cloak: '#1d5c4a', acc: 'cap', wide: 0.7,
+    },
   ],
 
   MAPS: [
