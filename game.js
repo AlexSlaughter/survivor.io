@@ -221,6 +221,8 @@
   // ---------- Estado ----------
   const WMAX = 5, SLOTS = 4, MAX_ENEMIES = 380;
   const PCOLORS = ['#4de1ff', '#ff6fb5'];
+  // Versiones más oscuras de los colores de jugador para los textos de los menús (fondo claro).
+  const PTEXT = ['#0b87b0', '#d63f86'];
   let G = null;
   let state = 'menu'; // menu | play | levelup | paused | over | win
 
@@ -937,7 +939,7 @@
     showOnly('levelup');
   }
   function showWaiting(text, color) {
-    $('lvTitle').innerHTML = `<span style="color:${color || '#ffd75e'}">${text}</span>`;
+    $('lvTitle').innerHTML = `<span style="color:${color || '#3a3d8f'}">${text}</span>`;
     $('choices').innerHTML = '<p class="sub waiting">⏳</p>';
     showOnly('levelup');
   }
@@ -952,14 +954,14 @@
     if (G.online === 'host') {
       if (p.idx !== G.localIdx) {
         Net.send({ t: 'lvl', opts: descs });
-        showWaiting(`Esperando a que ${esc(G.names[p.idx])} elija su mejora…`, p.color);
+        showWaiting(`Esperando a que ${esc(G.names[p.idx])} elija su mejora…`, PTEXT[p.idx]);
         return;
       }
       Net.send({ t: 'wait', who: p.idx });
-      renderChoices('¡Subes de nivel! <span style="color:' + p.color + '">Te toca elegir</span>', descs, pickIndex);
+      renderChoices('¡Subes de nivel! <span style="color:' + PTEXT[p.idx] + '">Te toca elegir</span>', descs, pickIndex);
       return;
     }
-    const title = G.coop ? `¡Subes de nivel! <span style="color:${p.color}">Elige ${pname(p)} (${esc(p.ch.name)})</span>` : '¡Subes de nivel!';
+    const title = G.coop ? `¡Subes de nivel! <span style="color:${PTEXT[p.idx]}">Elige ${pname(p)} (${esc(p.ch.name)})</span>` : '¡Subes de nivel!';
     renderChoices(title, descs, pickIndex);
   }
 
@@ -2713,11 +2715,11 @@
         case 'lvl':
           state = 'levelup'; releaseJoys();
           G.guestOpts = m.opts;
-          renderChoices('¡Subes de nivel! <span style="color:' + PCOLORS[G.localIdx] + '">Te toca elegir</span>', m.opts, pickIndex);
+          renderChoices('¡Subes de nivel! <span style="color:' + PTEXT[G.localIdx] + '">Te toca elegir</span>', m.opts, pickIndex);
           break;
         case 'wait':
           state = 'levelup'; releaseJoys();
-          showWaiting(`${esc(G.names[m.who])} está eligiendo su mejora…`, PCOLORS[m.who]);
+          showWaiting(`${esc(G.names[m.who])} está eligiendo su mejora…`, PTEXT[m.who]);
           break;
         case 'go': if (state === 'levelup') { state = 'play'; showOnly(null); } break;
         case 'paused': guestSetPaused(m.on); break;
@@ -2763,7 +2765,7 @@
     const host = lobby && lobby.role === 'host';
     const rows = host ? [me, lobby.remote] : [lobby && lobby.remote, me];
     $('lobbyPlayers').innerHTML = rows.map((r, i) =>
-      `<div class="lp" style="border-color:${PCOLORS[i]}"><b style="color:${PCOLORS[i]}">J${i + 1}${i === 0 ? ' · anfitrión' : ''}</b> ` +
+      `<div class="lp" style="border-color:${PTEXT[i]}"><b style="color:${PTEXT[i]}">J${i + 1}${i === 0 ? ' · anfitrión' : ''}</b> ` +
       (r ? `${esc(r.name)} — ${esc(charById(r.char).name)}` : '<span class="sub">esperando…</span>') + '</div>').join('');
     $('lobbyStart').classList.toggle('hidden', !(host && lobby.remote && Net.open));
   }
@@ -2927,7 +2929,7 @@
     let h = `<div class="row">🗺️ ${G.map.name}${G.coop ? ' · 👥 Cooperativo' : ''}</div>` +
       `<div class="row">⏱ ${fmtTime(G.time)} · Nv. ${G.level} · ☠ ${G.kills} · 🪙 ${G.gold}</div>`;
     for (const p of G.players) {
-      h += `<h3 style="color:${G.coop ? p.color : ''}">${G.coop ? pname(p) + ' · ' : ''}${esc(p.ch.name)} · ❤ ${Math.ceil(p.hp)}/${p.maxHp}${p.down ? ' · 💀 caído' : ''}</h3>`;
+      h += `<h3 style="color:${G.coop ? PTEXT[p.idx] : ''}">${G.coop ? pname(p) + ' · ' : ''}${esc(p.ch.name)} · ❤ ${Math.ceil(p.hp)}/${p.maxHp}${p.down ? ' · 💀 caído' : ''}</h3>`;
       for (const w of p.weapons) {
         const d = WEAPONS[w.id];
         h += w.evolved
