@@ -100,6 +100,62 @@ window.HN_DATA = {
     },
   ],
 
+  // ---------- Equipo ----------
+  // Cada objeto da bonificaciones (valor a nivel 1); suben un 50% del valor base por nivel hasta el 5.
+  // Las armas equipadas sustituyen al arma inicial del personaje.
+  RARITY: {
+    comun:      { name: 'Común',      color: '#b9c0d8', price: 150,  w: 50 },
+    raro:       { name: 'Raro',       color: '#4da3ff', price: 400,  w: 30 },
+    epico:      { name: 'Épico',      color: '#c06bff', price: 900,  w: 15 },
+    legendario: { name: 'Legendario', color: '#ffc23d', price: 2000, w: 5 },
+  },
+  EQUIP_SLOTS: [
+    { id: 'arma',    name: 'Arma',    icon: '⚔️' },
+    { id: 'casco',   name: 'Casco',   icon: '🪖' },
+    { id: 'pecho',   name: 'Pecho',   icon: '🦺' },
+    { id: 'botas',   name: 'Botas',   icon: '🥾' },
+    { id: 'amuleto', name: 'Amuleto', icon: '📿' },
+  ],
+  ITEMS: [
+    // Armas principales
+    { id: 'varita',       slot: 'arma', rarity: 'comun',      icon: '🪄', name: 'Varita Arcana',       weapon: 'chispa', stats: { dmg: 0.05 } },
+    { id: 'cuchillas',    slot: 'arma', rarity: 'raro',       icon: '🌀', name: 'Cuchillas Gemelas',   weapon: 'orbe',   stats: { hp: 10 } },
+    { id: 'disco_bronce', slot: 'arma', rarity: 'raro',       icon: '🥏', name: 'Disco de Bronce',     weapon: 'disco',  stats: { speed: 0.05 } },
+    { id: 'brasero',      slot: 'arma', rarity: 'raro',       icon: '🏮', name: 'Brasero de Mano',     weapon: 'halo',   stats: { area: 0.05 } },
+    { id: 'cetro',        slot: 'arma', rarity: 'epico',      icon: '🔱', name: 'Cetro de Tormenta',   weapon: 'rayo',   stats: { cd: 0.05, dmg: 0.05 } },
+    { id: 'filo_eclipse', slot: 'arma', rarity: 'legendario', icon: '🗡️', name: 'Filo del Eclipse',    weapon: 'chispa', stats: { dmg: 0.12, cd: 0.06 } },
+    // Cascos
+    { id: 'capucha',  slot: 'casco', rarity: 'comun',      icon: '🧢', name: 'Capucha de Viaje', stats: { hp: 10 } },
+    { id: 'yelmo',    slot: 'casco', rarity: 'raro',       icon: '⛑️', name: 'Yelmo de Hierro',  stats: { armor: 1, hp: 5 } },
+    { id: 'corona',   slot: 'casco', rarity: 'legendario', icon: '👑', name: 'Corona del Sabio', stats: { xp: 0.10, hp: 15 } },
+    // Pecho
+    { id: 'tunica',        slot: 'pecho', rarity: 'comun', icon: '👕', name: 'Túnica Reforzada', stats: { hp: 15 } },
+    { id: 'cota',          slot: 'pecho', rarity: 'raro',  icon: '🥋', name: 'Cota de Malla',    stats: { hp: 20, armor: 1 } },
+    { id: 'manto_estelar', slot: 'pecho', rarity: 'epico', icon: '🧥', name: 'Manto Estelar',    stats: { hp: 25, regen: 0.5 } },
+    // Botas
+    { id: 'sandalias',    slot: 'botas', rarity: 'comun', icon: '🩴', name: 'Sandalias Ligeras', stats: { speed: 0.05 } },
+    { id: 'botas_viento', slot: 'botas', rarity: 'raro',  icon: '👢', name: 'Botas del Viento',  stats: { speed: 0.06, magnet: 0.10 } },
+    { id: 'botas_fase',   slot: 'botas', rarity: 'epico', icon: '👟', name: 'Botas de Fase',     stats: { speed: 0.10, armor: 1 } },
+    // Amuletos
+    { id: 'colgante',   slot: 'amuleto', rarity: 'comun',      icon: '📿', name: 'Colgante de la Suerte', stats: { gold: 0.10 } },
+    { id: 'ojo_dragon', slot: 'amuleto', rarity: 'epico',      icon: '🧿', name: 'Ojo de Dragón',         stats: { dmg: 0.08 } },
+    { id: 'reliquia',   slot: 'amuleto', rarity: 'legendario', icon: '💠', name: 'Reliquia Antigua',      stats: { dmg: 0.08, area: 0.10, gold: 0.10 } },
+  ],
+  // Cómo se muestra cada bonificación.
+  STAT_LABELS: {
+    hp: ['vida', v => '+' + Math.round(v)],
+    armor: ['armadura', v => '+' + (Math.round(v * 10) / 10)],
+    speed: ['velocidad', v => '+' + Math.round(v * 100) + '%'],
+    dmg: ['daño', v => '+' + Math.round(v * 100) + '%'],
+    cd: ['recarga', v => '-' + Math.round(v * 100) + '%'],
+    area: ['área', v => '+' + Math.round(v * 100) + '%'],
+    magnet: ['recogida', v => '+' + Math.round(v * 100) + '%'],
+    xp: ['experiencia', v => '+' + Math.round(v * 100) + '%'],
+    gold: ['oro', v => '+' + Math.round(v * 100) + '%'],
+    regen: ['vida/s', v => '+' + (Math.round(v * 10) / 10)],
+  },
+  ITEM_MAX: 5,
+
   SHOP: [
     { id: 'poder',       name: 'Poder',      icon: '⚔️', desc: '+5% de daño',                  max: 5, cost: 60 },
     { id: 'vida',        name: 'Vitalidad',  icon: '❤️', desc: '+10 vida máxima',              max: 5, cost: 50 },

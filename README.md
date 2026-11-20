@@ -64,6 +64,23 @@ Se desbloquean con oro en la pantalla de selección.
 | Vulcan, Piromante | 🔥 Halo Ardiente | +15% daño, +10% área, -20 vida | 🪙 600 |
 | Nova, Tormenta | ⚡ Rayo Celeste | -12% recarga, +1 vida/s | 🪙 900 |
 
+### Equipo y Armería
+
+En **🎒 Equipo** tienes 5 huecos: **arma**, **casco**, **pecho**, **botas** y **amuleto**.
+
+- **El arma equipada sustituye al ataque básico** del personaje (por ejemplo, Aria con el *Cetro de Tormenta* empieza con Rayo Celeste) y además da una bonificación.
+- Los objetos tienen rareza (**común**, **raro**, **épico** y **legendario**) y se **mejoran con oro** hasta nivel 5. Cada nivel añade un 50% de la bonificación base.
+- Se compran en la **⚒️ Armería** o se consiguen como **🎁 botín**: cada jefe derrotado tiene un 50% de soltar un objeto (los legendarios solo si ganas la partida). Si ya lo tenías, sube de nivel.
+- En cooperativo local el equipo lo lleva J1. En online, cada jugador lleva el suyo.
+
+| Hueco | Objetos |
+|---|---|
+| ⚔️ Arma | Varita Arcana, Cuchillas Gemelas, Disco de Bronce, Brasero de Mano, Cetro de Tormenta, Filo del Eclipse |
+| 🪖 Casco | Capucha de Viaje, Yelmo de Hierro, Corona del Sabio |
+| 🦺 Pecho | Túnica Reforzada, Cota de Malla, Manto Estelar |
+| 🥾 Botas | Sandalias Ligeras, Botas del Viento, Botas de Fase |
+| 📿 Amuleto | Colgante de la Suerte, Ojo de Dragón, Reliquia Antigua |
+
 ### Mapas
 
 | Mapa | Dificultad | Oro | Cómo se desbloquea |

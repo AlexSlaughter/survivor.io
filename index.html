@@ -32,6 +32,7 @@
       <div class="stack">
         <button id="playBtn" class="primary big">Jugar</button>
         <div class="row2">
+          <button id="equipBtn">🎒 Equipo</button>
           <button id="shopBtn">🛒 Tienda</button>
           <button id="helpBtn">❓ Cómo jugar</button>
           <button id="accountBtn">👤 Cuenta</button>
@@ -50,6 +51,7 @@
         <li>🎮 Muévete con <b>WASD</b> / <b>flechas</b> o arrastrando el dedo por la pantalla.</li>
         <li>✨ Tus armas atacan solas. Recoge cristales para subir de nivel y elige mejoras.</li>
         <li>⭐ Lleva un arma a <b>Nv. 5</b>, consigue su objeto clave y abre un <b>cofre</b> (lo sueltan élites y jefes) para <b>evolucionarla</b>.</li>
+        <li>🎒 En <b>Equipo</b> te pones un arma principal (que sustituye al ataque básico del personaje), casco, pecho, botas y amuleto. Se compran en la <b>Armería</b>, se mejoran con oro y los jefes pueden soltarlos como botín.</li>
         <li>🪙 Gana oro en cada partida y gástalo en la <b>tienda</b>, en nuevos <b>personajes</b> y desbloquea <b>mapas</b> más difíciles.</li>
         <li>👥 <b>Cooperativo local</b>: J1 juega con WASD y J2 con las flechas, con un mando cada uno, o en una pantalla táctil (mitad izquierda J1, mitad derecha J2). Compartís nivel y oro, cada uno mejora sus propias armas por turnos y podéis reanimaros.</li>
         <li>🌐 <b>Online</b>: con la sesión iniciada, uno crea una sala y el otro se une con su código de 5 letras. Cada uno juega en su dispositivo.</li>
@@ -106,6 +108,7 @@
         <button data-m="online">🌐 Online</button>
       </div>
       <h2 id="p1Title">Elige personaje</h2>
+      <p id="eqNote" class="sub eqnote"></p>
       <div id="chars" class="grid"></div>
       <div id="p2Wrap" class="hidden">
         <h2 class="p2">Jugador 2</h2>
@@ -135,6 +138,23 @@
         <button class="back">Volver</button>
         <button id="startBtn" class="primary big">¡Comenzar!</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Equipo y Armería -->
+  <div id="equip" class="overlay hidden">
+    <div class="panel wide">
+      <div class="topbar"><span class="gold">🪙 <b class="goldAmt">0</b></span></div>
+      <h2>🎒 Equipo</h2>
+      <div id="eqSlots" class="eqslots"></div>
+      <p id="eqSummary" class="sub"></p>
+      <div id="eqTabs" class="seg">
+        <button data-t="inv">Mis objetos</button>
+        <button data-t="shop">⚒️ Armería</button>
+      </div>
+      <div id="eqList" class="grid shopgrid"></div>
+      <p id="eqMsg" class="msg"></p>
+      <div class="actions"><button id="eqBack">Volver</button></div>
     </div>
   </div>
 

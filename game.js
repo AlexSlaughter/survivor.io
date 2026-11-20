@@ -4,7 +4,8 @@
  * HTML5 Canvas + JavaScript puro, sin dependencias.
  */
 (() => {
-  const { WEAPONS, PASSIVES, ETYPES, BOSSES, CHARS, MAPS, SHOP } = window.HN_DATA;
+  const { WEAPONS, PASSIVES, ETYPES, BOSSES, CHARS, MAPS, SHOP, RARITY, EQUIP_SLOTS, ITEMS, STAT_LABELS, ITEM_MAX } = window.HN_DATA;
+  const itemById = id => ITEMS.find(it => it.id === id);
   const TAU = Math.PI * 2;
   const canvas = document.getElementById('game');
   const mainCtx = canvas.getContext('2d');
@@ -52,7 +53,7 @@
 
   // ---------- Guardado ----------
   const SAVE_KEY = 'hn_save_v1';
-  const defaultSave = () => ({ gold: 0, up: {}, chars: ['aria'], char: 'aria', map: 'bosque', best: {}, wins: {}, sfx: true, music: true, t: 0, mode: 'solo', char2: 'aria' });
+  const defaultSave = () => ({ gold: 0, up: {}, chars: ['aria'], char: 'aria', map: 'bosque', best: {}, wins: {}, sfx: true, music: true, t: 0, mode: 'solo', char2: 'aria', items: {}, equip: {} });
   function loadSave() {
     let s = null;
     try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* sin almacenamiento */ }
@@ -94,10 +95,25 @@
     if (MAPS.some(m => m.id === o.map)) d.map = o.map;
     d.sfx = o.sfx !== false; d.music = o.music !== false;
     d.t = Number.isFinite(+o.t) ? +o.t : 0;
+    Object.assign(d, sanitizeGear(o.items, o.equip));
     return d;
   }
 
   // Combina dos guardados: los desbloqueos se suman y el oro se toma del guardado más reciente.
+  // Equipo válido: niveles entre 1 y el máximo, y solo objetos que se tienen en el hueco correcto.
+  function sanitizeGear(items, equip) {
+    const out = { items: {}, equip: {} };
+    for (const it of ITEMS) {
+      const l = Math.floor(+(items && items[it.id]) || 0);
+      if (l > 0) out.items[it.id] = Math.min(ITEM_MAX, l);
+    }
+    for (const sl of EQUIP_SLOTS) {
+      const id = equip && equip[sl.id], it = itemById(id);
+      if (it && it.slot === sl.id && out.items[id]) out.equip[sl.id] = id;
+    }
+    return out;
+  }
+
   function mergeSaves(a, b) {
     const ta = a.t || 0, tb = b.t || 0;
     // Con la misma fecha (p. ej. guardados sin fecha) se conserva el que tenga más oro.
@@ -114,6 +130,9 @@
       if (w) m.wins[mp.id] = w;
     }
     m.t = Math.max(a.t || 0, b.t || 0);
+    m.items = {};
+    for (const it of ITEMS) { const l = Math.max(a.items[it.id] || 0, b.items[it.id] || 0); if (l) m.items[it.id] = l; }
+    m.equip = sanitizeGear(m.items, Object.keys(a.equip).length ? a.equip : b.equip).equip;
     if (!m.chars.includes(m.char)) m.char = 'aria';
     if (!m.chars.includes(m.char2)) m.char2 = 'aria';
     return m;
@@ -167,8 +186,25 @@
   let G = null;
   let state = 'menu'; // menu | play | levelup | paused | over | win
 
+  // Suma las bonificaciones del equipo puesto. Cada nivel añade un 50% del valor base.
+  const itemValue = (v, lvl) => v * (1 + 0.5 * (lvl - 1));
+  function gearStats(gear) {
+    const st = {};
+    let weapon = null;
+    if (!gear) return { st, weapon };
+    for (const sl of EQUIP_SLOTS) {
+      const it = itemById(gear.equip[sl.id]);
+      if (!it) continue;
+      const lvl = gear.items[it.id] || 1;
+      for (const k in it.stats) st[k] = (st[k] || 0) + itemValue(it.stats[k], lvl);
+      if (it.weapon) weapon = it.weapon;
+    }
+    return { st, weapon };
+  }
+  const myGear = () => ({ items: S.items, equip: S.equip });
+
   // `up` son las mejoras de la tienda de quien controla al personaje (en online, las del invitado).
-  function makePlayer(ch, idx, x, up = S.up) {
+  function makePlayer(ch, idx, x, up = S.up, gear = null) {
     const ul = id => Math.floor(+up[id] || 0);
     const m = ch.mods;
     const p = {
@@ -190,6 +226,13 @@
     s.magnet += 0.10 * ul('magnetismo');
     s.xp += 0.08 * ul('sabiduria');
     s.gold += 0.10 * ul('codicia');
+    // Equipo
+    const g = gearStats(gear), q = g.st;
+    p.maxHp += q.hp || 0; s.armor += q.armor || 0; s.speed += q.speed || 0; s.dmg += q.dmg || 0;
+    s.cd *= 1 - (q.cd || 0); s.area += q.area || 0; s.magnet += q.magnet || 0; s.xp += q.xp || 0;
+    s.gold += q.gold || 0; s.regen += q.regen || 0;
+    p.startWeapon = g.weapon || ch.weapon;
+    p.maxHp = Math.max(1, Math.round(p.maxHp));
     p.hp = p.maxHp;
     return p;
   }
@@ -198,8 +241,10 @@
   function newGame(online) {
     const map = mapById(online ? online.map : S.map), coop = !!online || S.mode === 'local';
     const chars = online ? online.chars : [S.char, S.char2], ups = online ? online.ups : [S.up, S.up];
-    const players = [makePlayer(charById(chars[0]), 0, coop ? -30 : 0, ups[0])];
-    if (coop) players.push(makePlayer(charById(chars[1]), 1, 30, ups[1]));
+    // En cooperativo local el equipo de la cuenta lo lleva J1; en online, cada uno el suyo.
+    const gears = online ? online.gears : [myGear(), null];
+    const players = [makePlayer(charById(chars[0]), 0, coop ? -30 : 0, ups[0], gears[0])];
+    if (coop) players.push(makePlayer(charById(chars[1]), 1, 30, ups[1], gears[1]));
     G = {
       time: 0, spawnAcc: 0, nextElite: 60, nextSwarm: 45, bossIdx: 0, shake: 0, pending: 0,
       boss: null, opts: [], map, gold: 0, coins: 0, bossKills: 0,
@@ -212,7 +257,7 @@
       leash: null, eid: 0, netEvents: [], netT: 0,
       enemies: [], bullets: [], ebullets: [], gems: [], pickups: [], particles: [], texts: [], effects: [],
     };
-    for (const p of players) addWeapon(p, p.ch.weapon);
+    for (const p of players) addWeapon(p, p.startWeapon);
   }
 
   const alive = () => G.players.filter(p => !p.down);
@@ -1528,7 +1573,7 @@
   }
 
   // ---------- Menús ----------
-  const overlays = ['menu', 'help', 'account', 'select', 'shop', 'lobby', 'levelup', 'pause', 'end'];
+  const overlays = ['menu', 'help', 'account', 'select', 'shop', 'equip', 'lobby', 'levelup', 'pause', 'end'];
   function showOnly(id) { for (const o of overlays) $(o).classList.toggle('hidden', o !== id); }
 
   function refreshGold() { document.querySelectorAll('.goldAmt').forEach(el => { el.textContent = S.gold; }); }
@@ -1598,6 +1643,7 @@
     $('onlineBox').classList.toggle('hidden', mode !== 'online');
     $('startBtn').classList.toggle('hidden', mode === 'online');
     $('mapTitle').textContent = mode === 'online' ? 'Elige mapa (lo decide quien crea la sala)' : 'Elige mapa';
+    renderEqNote();
     renderCharGrid('chars', 'char');
     if (mode === 'local') renderCharGrid('chars2', 'char2');
     if (mode === 'online') {
@@ -1626,6 +1672,105 @@
       });
       mbox.appendChild(b);
     }
+  }
+
+  // ---------- Equipo y Armería ----------
+  let eqTab = 'inv', eqReturn = 'menu';
+  const buyCost = it => RARITY[it.rarity].price;
+  const upCost = (it, lvl) => Math.round(RARITY[it.rarity].price * 0.4 * lvl);
+  function fmtStats(stats, lvl) {
+    return Object.keys(stats).map(k => `${STAT_LABELS[k][1](itemValue(stats[k], lvl))} ${STAT_LABELS[k][0]}`).join(' · ');
+  }
+  function eqMsg(text, err) { $('eqMsg').textContent = text; $('eqMsg').classList.toggle('err', !!err); }
+
+  function renderEquip() {
+    refreshGold();
+    // Huecos equipados
+    $('eqSlots').innerHTML = '';
+    for (const sl of EQUIP_SLOTS) {
+      const it = itemById(S.equip[sl.id]);
+      const b = document.createElement('button');
+      b.className = 'eqslot' + (it ? ' full' : '');
+      if (it) b.style.borderColor = RARITY[it.rarity].color;
+      b.title = it ? `Quitar ${it.name}` : sl.name;
+      b.innerHTML = it
+        ? `<span class="ic">${it.icon}</span><span class="lb">${sl.name}</span><span class="lv" style="color:${RARITY[it.rarity].color}">Nv. ${S.items[it.id]}</span>`
+        : `<span class="ic empty">${sl.icon}</span><span class="lb">${sl.name}</span><span class="lv">—</span>`;
+      b.addEventListener('click', () => {
+        if (!it) { eqTab = 'inv'; renderEquip(); return; }
+        delete S.equip[sl.id]; save(); Sound.play('click'); renderEquip();
+      });
+      $('eqSlots').appendChild(b);
+    }
+    // Resumen
+    const g = gearStats(myGear());
+    const total = Object.keys(g.st).map(k => `${STAT_LABELS[k][1](g.st[k])} ${STAT_LABELS[k][0]}`).join(' · ');
+    $('eqSummary').innerHTML = (g.weapon ? `Ataque básico: <b>${WEAPONS[g.weapon].icon} ${WEAPONS[g.weapon].name}</b> (sustituye al del personaje)<br>` : 'Sin arma equipada: usas el ataque básico de tu personaje.<br>') +
+      (total ? `Bonificaciones: ${total}` : 'Sin bonificaciones de equipo.');
+    document.querySelectorAll('#eqTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === eqTab));
+
+    const box = $('eqList');
+    box.innerHTML = '';
+    const order = it => EQUIP_SLOTS.findIndex(sl => sl.id === it.slot) * 10 + Object.keys(RARITY).indexOf(it.rarity);
+    const list = ITEMS.filter(it => (eqTab === 'inv') === !!S.items[it.id]).sort((a, b) => order(a) - order(b));
+    if (!list.length) {
+      box.innerHTML = `<p class="sub">${eqTab === 'inv' ? 'Aún no tienes objetos. Cómpralos en la ⚒️ Armería o derrota jefes para conseguir botín.' : '¡Ya tienes todos los objetos de la Armería!'}</p>`;
+    }
+    for (const it of list) {
+      const rar = RARITY[it.rarity], lvl = S.items[it.id] || 0, slot = EQUIP_SLOTS.find(sl => sl.id === it.slot);
+      const on = S.equip[it.slot] === it.id;
+      const d = document.createElement('div');
+      d.className = 'sel item' + (on ? ' equipped' : '');
+      d.style.borderColor = rar.color;
+      d.innerHTML =
+        `<div class="ic" style="font-size:30px">${it.icon}</div><div class="nm" style="color:${rar.color}">${it.name}</div>` +
+        `<div class="rar" style="color:${rar.color}">${rar.name} · ${slot.name}${lvl ? ` · Nv. ${lvl}` : ''}</div>` +
+        (it.weapon ? `<div class="wp">Ataque básico: ${WEAPONS[it.weapon].icon} ${WEAPONS[it.weapon].name}</div>` : '') +
+        `<div class="st">${fmtStats(it.stats, Math.max(1, lvl))}</div>`;
+      const btns = document.createElement('div');
+      btns.className = 'btns';
+      const mk = (text, cls, fn) => { const b = document.createElement('button'); b.textContent = text; if (cls) b.className = cls; b.addEventListener('click', fn); btns.appendChild(b); return b; };
+      if (!lvl) {
+        const cost = buyCost(it);
+        const b = mk(`🪙 ${cost}`, 'primary', () => {
+          if (S.gold < cost) { bump(d); eqMsg('No tienes oro suficiente.', true); return; }
+          S.gold -= cost; S.items[it.id] = 1;
+          if (!S.equip[it.slot]) S.equip[it.slot] = it.id;
+          save(); Sound.play('buy');
+          eqMsg(`✔ Has comprado ${it.name}` + (S.equip[it.slot] === it.id ? ' y te lo has equipado.' : '. Equípatelo en «Mis objetos».'));
+          renderEquip();
+        });
+        if (S.gold < cost) b.style.opacity = '.6';
+      } else {
+        mk(on ? 'Quitar' : 'Equipar', on ? '' : 'primary', () => {
+          if (on) delete S.equip[it.slot]; else S.equip[it.slot] = it.id;
+          save(); Sound.play('click'); eqMsg(''); renderEquip();
+        });
+        if (lvl < ITEM_MAX) {
+          const cost = upCost(it, lvl);
+          const b = mk(`⬆ 🪙 ${cost}`, '', () => {
+            if (S.gold < cost) { bump(d); eqMsg('No tienes oro suficiente.', true); return; }
+            S.gold -= cost; S.items[it.id] = lvl + 1; save(); Sound.play('buy');
+            eqMsg(`✔ ${it.name} sube a nivel ${lvl + 1}: ${fmtStats(it.stats, lvl + 1)}`);
+            renderEquip();
+          });
+          b.title = `Mejorar a nivel ${lvl + 1}: ${fmtStats(it.stats, lvl + 1)}`;
+          if (S.gold < cost) b.style.opacity = '.6';
+        } else mk('MÁX', '', () => {}).disabled = true;
+      }
+      d.appendChild(btns);
+      box.appendChild(d);
+    }
+  }
+  function openEquip(from) { eqReturn = from; eqMsg(''); renderEquip(); showOnly('equip'); }
+
+  function renderEqNote() {
+    const g = gearStats(myGear());
+    const extra = S.mode === 'local' ? ' (lo lleva J1)' : '';
+    $('eqNote').innerHTML = (g.weapon
+      ? `🎒 Arma equipada${extra}: <b>${WEAPONS[g.weapon].icon} ${WEAPONS[g.weapon].name}</b>, que sustituye al ataque básico del personaje.`
+      : `🎒 Sin arma equipada: cada personaje usa su ataque básico.`) + ' <button id="eqNoteBtn">Cambiar equipo</button>';
+    $('eqNoteBtn').addEventListener('click', () => { Sound.play('click'); openEquip('select'); });
   }
 
   function renderShop() {
@@ -1935,7 +2080,7 @@
     Sound.stopMusic();
     Sound.play(m.win ? 'win' : 'lose');
     const map = mapById(m.map);
-    const r = recordRun(m.win, m.time, map, m.base, 1 + 0.1 * upLvl('codicia'));
+    const r = recordRun(m.win, m.time, map, m.base, 1 + 0.1 * upLvl('codicia') + (gearStats(myGear()).st.gold || 0), Math.min(2, +m.bossKills || 0));
     Object.assign(r, { t: m.time, level: m.level, kills: m.kills });
     $('retryBtn').classList.add('hidden');
     showEnd(m.win, m.win ? '¡Victoria!' : 'Habéis caído', '🌐 Online: ' + G.names.map(esc).join(' y ') + '<br>', r,
@@ -1991,7 +2136,7 @@
   addEventListener('resize', () => { if (G && G.online === 'guest') Net.send({ t: 'view', vw: VW, vh: VH }); });
 
   function myName() { return (Cloud.user && Cloud.user.name) || 'Jugador'; }
-  function myHello() { return { t: 'hello', name: myName(), char: S.char, up: S.up, vw: VW, vh: VH }; }
+  function myHello() { return { t: 'hello', name: myName(), char: S.char, up: S.up, items: S.items, equip: S.equip, vw: VW, vh: VH }; }
 
   function lobbyStatus(text, err) {
     const el = $('lobbyStatus');
@@ -2010,7 +2155,7 @@
 
   function onHello(m) {
     if (!lobby) lobby = { role: Net.role, remote: null };
-    lobby.remote = { name: String(m.name || 'Jugador').slice(0, 40), char: m.char, up: m.up || {}, vw: +m.vw || 0, vh: +m.vh || 0 };
+    lobby.remote = { name: String(m.name || 'Jugador').slice(0, 40), char: m.char, up: m.up || {}, gear: sanitizeGear(m.items, m.equip), vw: +m.vw || 0, vh: +m.vh || 0 };
     renderLobby();
     if (lobby.role === 'host') {
       lobbyStatus(`¡${lobby.remote.name} se ha unido! Pulsa «¡Comenzar!» cuando estéis listos.`);
@@ -2056,7 +2201,7 @@
     if (!Net.open || !lobby || !lobby.remote) return;
     const r = lobby.remote;
     const online = {
-      map: S.map, chars: [S.char, charById(r.char).id], ups: [S.up, r.up],
+      map: S.map, chars: [S.char, charById(r.char).id], ups: [S.up, r.up], gears: [myGear(), r.gear],
       names: [myName(), r.name], vw: r.vw, vh: r.vh,
     };
     Sound.init();
@@ -2180,15 +2325,33 @@
   }
 
   // Guarda el resultado de una partida en el progreso de esta cuenta.
-  function recordRun(win, t, map, base, goldMult) {
+  // Botín: cada jefe derrotado da un 50% de conseguir un objeto nuevo (o subir uno que ya tienes).
+  function rollLoot(bossKills, win) {
+    const got = [];
+    for (let i = 0; i < bossKills; i++) {
+      if (Math.random() >= 0.5) continue;
+      const pool = ITEMS.filter(it => it.rarity !== 'legendario' || win);
+      const total = pool.reduce((a, it) => a + RARITY[it.rarity].w, 0);
+      let r = Math.random() * total, it = pool[0];
+      for (const c of pool) { r -= RARITY[c.rarity].w; if (r <= 0) { it = c; break; } }
+      const had = S.items[it.id] || 0;
+      if (had >= ITEM_MAX) continue;
+      S.items[it.id] = had + 1;
+      got.push({ it, up: had > 0 });
+    }
+    return got;
+  }
+
+  function recordRun(win, t, map, base, goldMult, bossKills = 0) {
     const lockedBefore = MAPS.filter(m => !mapUnlocked(m)).map(m => m.id);
     let record = false;
     if (t > (S.best[map.id] || 0)) { S.best[map.id] = t; record = true; }
     if (win) S.wins[map.id] = (S.wins[map.id] || 0) + 1;
     const earned = Math.round(base * map.gold * goldMult);
     S.gold += earned;
+    const loot = rollLoot(bossKills, win);
     save();
-    return { earned, record, newMaps: MAPS.filter(m => lockedBefore.includes(m.id) && mapUnlocked(m)) };
+    return { earned, record, loot, newMaps: MAPS.filter(m => lockedBefore.includes(m.id) && mapUnlocked(m)) };
   }
 
   function showEnd(win, title, info, r, extra) {
@@ -2199,6 +2362,7 @@
       `Tiempo: <b>${fmtTime(r.t)}</b>${r.record ? ' 🏆' : ''}<br>Nivel: <b>${r.level}</b> · Enemigos: <b>${r.kills}</b><br>` +
       `Oro ganado: <b>🪙 ${r.earned}</b> (total ${S.gold})` +
       r.newMaps.map(m => `<br><span class="unlock">¡Nuevo mapa desbloqueado: ${m.emoji} ${m.name}!</span>`).join('') +
+      (r.loot || []).map(l => `<br><span class="unlock">🎁 Botín: <span style="color:${RARITY[l.it.rarity].color}">${l.it.icon} ${l.it.name}</span>${l.up ? ' (sube de nivel)' : ''}</span>`).join('') +
       (extra || '');
     $('pauseBtn').classList.add('hidden');
     showOnly('end');
@@ -2212,8 +2376,8 @@
     Sound.play(win ? 'win' : 'lose');
     const t = G.time, map = G.map;
     const base = G.gold + Math.floor(t / 10) + G.bossKills * 50 + (win ? 150 : 0);
-    const r = recordRun(win, t, map, base, G.players[0].stats.gold);
-    if (G.online === 'host') Net.send({ t: 'end', win, time: t, level: G.level, kills: G.kills, base, map: map.id });
+    const r = recordRun(win, t, map, base, G.players[0].stats.gold, G.bossKills);
+    if (G.online === 'host') Net.send({ t: 'end', win, time: t, level: G.level, kills: G.kills, base, map: map.id, bossKills: G.bossKills });
     Object.assign(r, { t, level: G.level, kills: G.kills });
     const who = G.online ? '🌐 Online: ' + G.names.map(esc).join(' y ') + '<br>'
       : G.coop ? '👥 Cooperativo: ' + G.players.map(p => esc(p.ch.name)).join(' y ') + '<br>' : '';
@@ -2224,6 +2388,11 @@
   const click = (id, fn) => $(id).addEventListener('click', () => { Sound.init(); Sound.play('click'); fn(); });
   click('playBtn', () => { renderSelect(); showOnly('select'); });
   click('shopBtn', () => { renderShop(); showOnly('shop'); });
+  click('equipBtn', () => openEquip('menu'));
+  click('eqBack', () => { if (eqReturn === 'select') { renderSelect(); showOnly('select'); } else openMenu(); });
+  document.querySelectorAll('#eqTabs button').forEach(b => b.addEventListener('click', () => {
+    Sound.play('click'); eqTab = b.dataset.t; eqMsg(''); renderEquip();
+  }));
   click('helpBtn', () => showOnly('help'));
   document.querySelectorAll('#modeRow button').forEach(b => b.addEventListener('click', () => {
     Sound.init(); Sound.play('click');
