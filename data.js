@@ -192,10 +192,10 @@ window.HN_DATA = {
   // Cada objeto da bonificaciones (valor a nivel 1); suben un 50% del valor base por nivel hasta el 5.
   // Las armas equipadas sustituyen al arma inicial del personaje.
   RARITY: {
-    comun:      { name: 'Común',      color: '#7d869f', price: 150,  w: 50 },
-    raro:       { name: 'Raro',       color: '#1a8fd0', price: 400,  w: 30 },
-    epico:      { name: 'Épico',      color: '#8250e6', price: 900,  w: 15 },
-    legendario: { name: 'Legendario', color: '#c58a00', price: 2000, w: 5 },
+    comun:      { name: 'Común',      color: '#8e8aa8', price: 150,  w: 50 },
+    raro:       { name: 'Raro',       color: '#4f9fd1', price: 400,  w: 30 },
+    epico:      { name: 'Épico',      color: '#9a74e0', price: 900,  w: 15 },
+    legendario: { name: 'Legendario', color: '#c99a2e', price: 2000, w: 5 },
   },
   EQUIP_SLOTS: [
     { id: 'arma',    name: 'Arma',    icon: '⚔️' },

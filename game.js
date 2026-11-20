@@ -222,7 +222,7 @@
   const WMAX = 5, SLOTS = 4, MAX_ENEMIES = 380;
   const PCOLORS = ['#4de1ff', '#ff6fb5'];
   // Versiones más oscuras de los colores de jugador para los textos de los menús (fondo claro).
-  const PTEXT = ['#0b87b0', '#d63f86'];
+  const PTEXT = ['#3f8fb3', '#c9628f'];
   let G = null;
   let state = 'menu'; // menu | play | levelup | paused | over | win
 
@@ -939,7 +939,7 @@
     showOnly('levelup');
   }
   function showWaiting(text, color) {
-    $('lvTitle').innerHTML = `<span style="color:${color || '#3a3d8f'}">${text}</span>`;
+    $('lvTitle').innerHTML = `<span style="color:${color || '#6c62c4'}">${text}</span>`;
     $('choices').innerHTML = '<p class="sub waiting">⏳</p>';
     showOnly('levelup');
   }
