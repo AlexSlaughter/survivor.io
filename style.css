@@ -275,3 +275,5 @@ h2.p2, b.p2 { color: #ff6fb5; }
 .rou-result .rs { font-size: 14px; color: #c7cbf0; margin-top: 4px; }
 @keyframes pop { 0% { transform: scale(.2); opacity: 0; } 70% { transform: scale(1.2); } 100% { transform: scale(1); opacity: 1; } }
 button:disabled { opacity: .45; cursor: default; filter: grayscale(.4); }
+
+.compnote { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; background: rgba(111, 255, 176, .08); border: 1px solid #3fae74; color: #c9ffe0; font-size: 14px; line-height: 1.45; }

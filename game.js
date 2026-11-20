@@ -55,7 +55,31 @@
 
   // ---------- Guardado ----------
   const SAVE_KEY = 'hn_save_v1';
-  const defaultSave = () => ({ gold: 0, up: {}, chars: ['marc'], char: 'marc', map: 'bosque', best: {}, wins: {}, sfx: true, music: true, t: 0, mode: 'solo', char2: 'marc', items: {}, equip: {} });
+  // Compensación única por lo que se retiró del juego: personajes antiguos (su precio) y
+  // armas antiguas de la ruleta (su valor según la rareza más lo invertido en mejorarlas).
+  const LEGACY_CHARS = { bruno: ['Bruno', 250], kira: ['Kira', 400], vulcan: ['Vulcan', 600], nova: ['Nova', 900] };
+  const LEGACY_ITEMS = {
+    varita: ['Varita Arcana', 'comun'], cuchillas: ['Cuchillas Gemelas', 'raro'], disco_bronce: ['Disco de Bronce', 'raro'],
+    brasero: ['Brasero de Mano', 'raro'], cetro: ['Cetro de Tormenta', 'epico'], filo_eclipse: ['Filo del Eclipse', 'legendario'],
+  };
+  function legacyRefund(o) {
+    let gold = 0;
+    const names = [];
+    const chars = Array.isArray(o.chars) ? o.chars : [];
+    for (const id in LEGACY_CHARS) if (chars.includes(id)) { gold += LEGACY_CHARS[id][1]; names.push(LEGACY_CHARS[id][0]); }
+    for (const id in LEGACY_ITEMS) {
+      const lvl = Math.min(ITEM_MAX, Math.floor(+(o.items && o.items[id]) || 0));
+      if (lvl <= 0) continue;
+      const price = RARITY[LEGACY_ITEMS[id][1]].price;
+      let v = price;
+      for (let k = 1; k < lvl; k++) v += Math.round(price * 0.4 * k);
+      gold += v;
+      names.push(LEGACY_ITEMS[id][0] + (lvl > 1 ? ` Nv. ${lvl}` : ''));
+    }
+    return { gold, names };
+  }
+
+  const defaultSave = () => ({ gold: 0, up: {}, chars: ['marc'], char: 'marc', map: 'bosque', best: {}, wins: {}, sfx: true, music: true, t: 0, mode: 'solo', char2: 'marc', items: {}, equip: {}, comp1: true });
   function loadSave() {
     let s = null;
     try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* sin almacenamiento */ }
@@ -72,6 +96,8 @@
     return d;
   }
   const S = loadSave();
+  let pendingComp = null;
+  if (S.compNote) { pendingComp = S.compNote; delete S.compNote; try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* nada */ } }
   function saveLocal() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* sin almacenamiento */ } }
   function save() { S.t = Date.now(); saveLocal(); queueCloud(); }
 
@@ -98,6 +124,12 @@
     d.sfx = o.sfx !== false; d.music = o.music !== false;
     d.t = Number.isFinite(+o.t) ? +o.t : 0;
     Object.assign(d, sanitizeGear(o.items, o.equip));
+    // Guardados de antes del cambio de personajes y armas: se compensa una sola vez.
+    if (!o.comp1) {
+      const c = legacyRefund(o);
+      if (c.gold > 0) { d.gold += c.gold; d.compNote = c; }
+    }
+    d.comp1 = true;
     return d;
   }
 
@@ -161,7 +193,11 @@
     cloudBusy = true; lastPull = Date.now();
     try {
       const remote = await Cloud.load();
-      if (remote) { replaceSave(mergeSaves(S, sanitize(remote))); saveLocal(); }
+      if (remote) {
+        const rs = sanitize(remote);
+        if (rs.compNote) { showComp(rs.compNote); delete rs.compNote; }
+        replaceSave(mergeSaves(S, rs)); saveLocal();
+      }
       await Cloud.store(S);
       cloudErr = '';
     } catch (e) {
@@ -2169,6 +2205,12 @@
     $('bestTime').textContent = b > 0 ? `Mejor tiempo en ${mapById(S.map).name}: ${fmtTime(b)}` : '';
   }
 
+  function showComp(c) {
+    const el = $('compNote');
+    el.innerHTML = `🎁 <b>Compensación:</b> has recibido <b>🪙 ${c.gold}</b> por lo que se retiró del juego (${c.names.map(esc).join(', ')}).`;
+    el.classList.remove('hidden');
+  }
+
   function openMenu() { refreshGold(); syncToggles(); updateBest(); renderAccount(); showOnly('menu'); pullCloud(false); }
 
   // ---------- Pantalla de cuenta ----------
@@ -2244,6 +2286,7 @@
   $('importBtn').addEventListener('click', () => {
     try {
       const imp = parseCode($('importCode').value);
+      if (imp.compNote) { showComp(imp.compNote); delete imp.compNote; }
       replaceSave(mergeSaves(S, imp));
       save();
       $('importCode').value = '';
@@ -2794,6 +2837,7 @@
     } else if (state === 'levelup') Sound.resume();
   });
   openMenu();
+  if (pendingComp) showComp(pendingComp);
 
   // ---------- Bucle principal ----------
   let last = performance.now();
