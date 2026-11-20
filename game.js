@@ -220,9 +220,9 @@
 
   // ---------- Estado ----------
   const WMAX = 5, SLOTS = 4, MAX_ENEMIES = 380;
-  const PCOLORS = ['#4de1ff', '#ff6fb5'];
+  const PCOLORS = ['#4de1ff', '#ff6fb5', '#ffd166', '#7dff9a'];
   // Versiones más oscuras de los colores de jugador para los textos de los menús (fondo claro).
-  const PTEXT = ['#3f8fb3', '#c9628f'];
+  const PTEXT = ['#3f8fb3', '#c9628f', '#b0841f', '#3a9a6c'];
   let G = null;
   let state = 'menu'; // menu | play | levelup | paused | over | win
 
@@ -286,17 +286,18 @@
     const chars = online ? online.chars : [S.char, S.char2], ups = online ? online.ups : [S.up, S.up];
     // En cooperativo local el equipo de la cuenta lo lleva J1; en online, cada uno el suyo.
     const gears = online ? online.gears : [myGear(), null];
-    const players = [makePlayer(charById(chars[0]), 0, coop ? -30 : 0, ups[0], gears[0])];
-    if (coop) players.push(makePlayer(charById(chars[1]), 1, 30, ups[1], gears[1]));
+    const n = coop ? chars.length : 1;
+    const players = [];
+    for (let i = 0; i < n; i++) players.push(makePlayer(charById(chars[i]), i, coop ? (i - (n - 1) / 2) * 60 : 0, ups[i], gears[i]));
     G = {
       time: 0, spawnAcc: 0, nextElite: 60, nextSwarm: 45, bossIdx: 0, shake: 0, pending: 0,
       boss: null, opts: [], map, gold: 0, coins: 0, bossKills: 0,
       coop, players, p: players[0], cx: 0, cy: 0,
       level: 1, xp: 0, xpNext: 5, kills: 0, chooser: 0, chooserP: null,
-      // Con dos jugadores aparecen más enemigos y son más resistentes.
-      diffHp: coop ? 1.25 : 1, diffRate: coop ? 1.4 : 1, diffBoss: coop ? 1.6 : 1,
+      // Con más jugadores aparecen más enemigos y son más resistentes.
+      diffHp: 1 + 0.25 * (n - 1), diffRate: 1 + 0.4 * (n - 1), diffBoss: 1 + 0.6 * (n - 1),
       online: online ? 'host' : null, localIdx: 0, names: online ? online.names : null,
-      remote: null, remoteVW: online ? online.vw : 0, remoteVH: online ? online.vh : 0,
+      remote: {}, views: online ? online.views : {}, slotOf: [], idxOf: {},
       leash: null, eid: 0, netEvents: [], netT: 0,
       enemies: [], bullets: [], ebullets: [], gems: [], pickups: [], particles: [], texts: [], effects: [],
     };
@@ -542,7 +543,8 @@
     while (G.xp >= G.xpNext) {
       G.xp -= G.xpNext;
       G.level++;
-      G.xpNext = Math.floor((4 + G.level * 5 + Math.pow(G.level, 1.5)) * (G.coop ? 0.8 : 1));
+      // Con más jugadores las mejoras se reparten, así que se sube de nivel algo más rápido.
+      G.xpNext = Math.floor((4 + G.level * 5 + Math.pow(G.level, 1.5)) * Math.max(0.6, 1 - 0.2 * (G.players.length - 1)));
       G.pending++;
     }
   }
@@ -953,7 +955,9 @@
     const descs = G.opts.map(o => describe(p, o));
     if (G.online === 'host') {
       if (p.idx !== G.localIdx) {
-        Net.send({ t: 'lvl', opts: descs });
+        const slot = G.slotOf[p.idx];
+        Net.sendTo(slot, { t: 'lvl', opts: descs });
+        Net.sendExcept(slot, { t: 'wait', who: p.idx });
         showWaiting(`Esperando a que ${esc(G.names[p.idx])} elija su mejora…`, PTEXT[p.idx]);
         return;
       }
@@ -1088,12 +1092,15 @@
   // ---------- Actualización ----------
   const REVIVE_TIME = 3;
   function updatePlayers(dt) {
-    const both = G.coop && alive().length === 2;
+    const both = G.coop && alive().length >= 2;
     // Los dos jugadores deben caber en pantalla: nadie puede alejarse del centro más que esto.
-    const lw = Math.min(VW, G.remoteVW || VW), lh = Math.min(VH, G.remoteVH || VH);
+    // La correa usa la pantalla más pequeña de todos los jugadores.
+    const vs = Object.values(G.views || {});
+    const lw = Math.min(VW, ...vs.map(v => v.vw || VW)), lh = Math.min(VH, ...vs.map(v => v.vh || VH));
     const hw = lw / 2 - 40, hh = lh / 2 - 50;
     G.leash = [Math.round(hw), Math.round(hh)];
     for (const p of G.players) {
+      if (p.gone) continue;
       if (p.down) {
         const helper = G.players.find(q => q !== p && !q.down && dist2(q.x, q.y, p.x, p.y) < 55 * 55);
         if (helper) {
@@ -1109,7 +1116,7 @@
       }
       if (G.online === 'host' && p.idx !== G.localIdx) {
         // El invitado mueve a su personaje en su propia pantalla y nos envía la posición.
-        const r = G.remote;
+        const r = G.remote[p.idx];
         if (r) { p.x = r.x; p.y = r.y; p.face = { x: r.fx, y: r.fy }; p.side = r.side; p.walk = r.walk; }
         p.inv -= dt;
         if (p.stats.regen) p.hp = Math.min(p.maxHp, p.hp + p.stats.regen * dt);
@@ -1653,6 +1660,7 @@
 
   function drawPlayers() {
     for (const p of G.players) {
+      if (p.gone) continue;
       const bob = Math.sin(p.walk) * 1.5, face = { x: p.face.x, y: p.face.y, side: p.side };
       if (p.down) {
         // Jugador caído: fantasma con el anillo de reanimación.
@@ -1926,8 +1934,10 @@
       ctx.fillText(label, x + sz - 4, y + sz - 4);
     };
     for (const p of G.players) {
-      const right = p.idx === 1;
-      const y0 = right ? st + 70 : st + 36;
+      if (p.gone) continue;
+      // J1 y J3 a la izquierda; J2 y J4 a la derecha (bajo el botón de pausa).
+      const right = p.idx % 2 === 1;
+      const y0 = (right ? st + 70 : st + 36) + Math.floor(p.idx / 2) * (gap * 3 + 6);
       const xAt = i => right ? W - sr - 10 - sz - i * gap : sl + 10 + i * gap;
       ctx.globalAlpha = p.down ? 0.4 : 1;
       if (G.coop) {
@@ -1945,7 +1955,7 @@
 
     // Indicador de un compañero caído fuera de la pantalla
     for (const p of G.players) {
-      if (!p.down || inView(p.x, p.y, -20)) continue;
+      if (!p.down || p.gone || inView(p.x, p.y, -20)) continue;
       const sx = (p.x - camX) * ZOOM, sy = (p.y - camY) * ZOOM;
       const m = 34, x = Math.max(m, Math.min(W - m, sx)), y = Math.max(st + 90, Math.min(H - sb - 60, sy));
       const a = Math.atan2(sy - y, sx - x);
@@ -2514,11 +2524,17 @@
   const BULLET_IDX = { chispa: 0, disco: 1, bala: 2, cohete: 3 };
   const PICK_IDX = { cofre: 0, carne: 1, iman: 2, moneda: 3 };
   const r1 = v => Math.round(v * 10) / 10;
-  let lobby = null;      // { role, remote } mientras se prepara la sala
+  let lobby = null;      // { role, remotes: {plaza: datos}, roster: [...] } mientras se prepara la sala
   let lastOnline = null; // 'host' | 'guest' tras una partida online (para la revancha)
+  const listNames = names => {
+    const n = names.map(esc);
+    return n.length > 1 ? n.slice(0, -1).join(', ') + ' y ' + n[n.length - 1] : n.join('');
+  };
 
   function makeSnapshot() {
-    const hw = Math.max(VW, G.remoteVW || 0) / 2 + 160, hh = Math.max(VH, G.remoteVH || 0) / 2 + 160;
+    // Se envía todo lo que pueda verse en la pantalla más grande de los jugadores.
+    const vs = Object.values(G.views || {});
+    const hw = Math.max(VW, ...vs.map(v => v.vw || 0)) / 2 + 160, hh = Math.max(VH, ...vs.map(v => v.vh || 0)) / 2 + 160;
     const near = o => Math.abs(o.x - G.cx) < hw && Math.abs(o.y - G.cy) < hh;
     const R = Math.round;
     const snap = {
@@ -2528,7 +2544,7 @@
       p: G.players.map(p => [r1(p.x), r1(p.y), r1(p.hp), p.maxHp, p.down ? 1 : 0, r1(p.reviveT), r1(p.face.x), r1(p.face.y),
         p.side, r1(p.walk), r1(p.inv), p.revives, p.stats.speed,
         p.weapons.map(w => [w.id, w.lvl, w.evolved ? 1 : 0, Math.round(w.angle * 100) / 100, w.n || 0, r1(w.R || 0), r1(w.br || 0)]),
-        p.passives]),
+        p.passives, p.gone ? 1 : 0]),
       e: [], bu: [], eb: [], gm: [], pk: [], ev: G.netEvents.splice(0),
     };
     for (const e of G.enemies) {
@@ -2562,16 +2578,17 @@
   function startGuest(m) {
     Sound.init();
     lastOnline = 'guest';
+    const n = m.chars.length;
     G = {
-      online: 'guest', localIdx: 1, coop: true, map: mapById(m.map), names: m.names,
+      online: 'guest', localIdx: m.you || 1, coop: true, map: mapById(m.map), names: m.names,
       time: 0, level: 1, xp: 0, xpNext: 5, kills: 0, gold: 0, shake: 0, boss: null, cx: 0, cy: 0, leash: [400, 300],
-      players: m.chars.map((c, i) => viewPlayer(charById(c), i, i ? 30 : -30)),
+      players: m.chars.map((c, i) => viewPlayer(charById(c), i, (i - (n - 1) / 2) * 60)),
       enemies: [], emap: new Map(), bullets: [], ebullets: [], gems: [], pickups: [], particles: [], texts: [], effects: [],
       snapT: performance.now(), snapDt: 0.05, sendT: 0, guestOpts: null, opts: [],
     };
     G.p = G.players[G.localIdx];
     beginPlay();
-    toast(`🌐 Jugando con ${m.names[0]}` + (isTouch ? ' · arrastra el dedo para moverte' : ''), true);
+    toast(`🌐 Jugando con ${listNames(m.names.filter((_, i) => i !== G.localIdx))}` + (isTouch ? ' · arrastra el dedo para moverte' : ''), true);
   }
 
   function applySnapshot(sn) {
@@ -2584,7 +2601,8 @@
     sn.p.forEach((v, i) => {
       const p = G.players[i];
       if (!p) return;
-      const [x, y, hp, maxHp, down, reviveT, fx, fy, side, walk, inv, revives, speed, weapons, passives] = v;
+      const [x, y, hp, maxHp, down, reviveT, fx, fy, side, walk, inv, revives, speed, weapons, passives, gone] = v;
+      p.gone = !!gone;
       const wasDown = p.down;
       Object.assign(p, {
         hp, maxHp, down: !!down, reviveT, inv, revives, passives,
@@ -2650,16 +2668,18 @@
     for (const b of G.ebullets) { b.x += b.vx * dt; b.y += b.vy * dt; }
     for (const q of G.pickups) q.t += dt;
 
-    const me = G.players[G.localIdx], other = G.players.find(q => q !== me);
+    const me = G.players[G.localIdx];
     if (state === 'play' && !me.down) {
       const { dx, dy } = inputDir(G.localIdx);
       const sp = 170 * me.stats.speed;
       me.x += dx * sp * dt; me.y += dy * sp * dt;
-      if (other && !other.down) {
-        // La misma correa que aplica el anfitrión: no alejarse más que el ancho de la pantalla.
+      const grp = G.players.filter(q => !q.down && !q.gone);
+      if (grp.length >= 2) {
+        // La misma correa que aplica el anfitrión: no alejarse del centro del grupo más que media pantalla.
         const [hw, hh] = G.leash;
-        me.x = Math.max(other.x - 2 * hw, Math.min(other.x + 2 * hw, me.x));
-        me.y = Math.max(other.y - 2 * hh, Math.min(other.y + 2 * hh, me.y));
+        const cx = grp.reduce((a, q) => a + q.x, 0) / grp.length, cy = grp.reduce((a, q) => a + q.y, 0) / grp.length;
+        me.x = Math.max(cx - hw, Math.min(cx + hw, me.x));
+        me.y = Math.max(cy - hh, Math.min(cy + hh, me.y));
       }
       if (dx || dy) {
         const l = Math.hypot(dx, dy);
@@ -2668,7 +2688,7 @@
         me.walk += dt * 10;
       }
     }
-    const al = G.players.filter(p => !p.down);
+    const al = G.players.filter(p => !p.down && !p.gone);
     if (al.length) {
       G.cx = al.reduce((a, p) => a + p.x, 0) / al.length;
       G.cy = al.reduce((a, p) => a + p.y, 0) / al.length;
@@ -2700,13 +2720,14 @@
     const r = recordRun(m.win, m.time, map, m.base, 1 + 0.1 * upLvl('codicia') + (gearStats(myGear()).st.gold || 0), Math.min(2, +m.bossKills || 0));
     Object.assign(r, { t: m.time, level: m.level, kills: m.kills });
     $('retryBtn').classList.add('hidden');
-    showEnd(m.win, m.win ? '¡Victoria!' : 'Habéis caído', '🌐 Online: ' + G.names.map(esc).join(' y ') + '<br>', r,
+    showEnd(m.win, m.win ? '¡Victoria!' : 'Habéis caído', '🌐 Online: ' + listNames(G.names) + '<br>', r,
       '<br><span id="endWait" class="sub">Esperando a que el anfitrión decida si jugáis otra vez…</span>');
   }
 
-  // Mensajes recibidos del otro jugador.
-  Net.onMessage = m => {
-    if (m.t === 'hello') return onHello(m);
+  // Mensajes recibidos. En el anfitrión, `slot` es la plaza del invitado que lo envía.
+  Net.onMessage = (m, slot) => {
+    if (m.t === 'hello') return onHello(m, slot);
+    if (m.t === 'roster') { if (lobby) { lobby.roster = m.list; renderLobby(); } return; }
     if (m.t === 'start') return startGuest(m);
     if (!G) return;
     if (G.online === 'guest') {
@@ -2726,28 +2747,31 @@
         case 'end': guestEnd(m); break;
       }
     } else if (G.online === 'host') {
+      const idx = G.idxOf[slot];
+      if (idx == null) return;
       switch (m.t) {
-        case 'in': G.remote = m; break;
-        case 'view': G.remoteVW = m.vw; G.remoteVH = m.vh; break;
+        case 'in': G.remote[idx] = m; break;
+        case 'view': G.views[slot] = { vw: m.vw, vh: m.vh }; break;
         case 'pausereq': togglePause(); break;
         case 'pick':
-          if (state === 'levelup' && G.chooserP && G.chooserP.idx !== G.localIdx && G.opts[m.i]) choose(G.opts[m.i]);
+          if (state === 'levelup' && G.chooserP && G.chooserP.idx === idx && G.opts[m.i]) choose(G.opts[m.i]);
           break;
       }
     }
   };
 
   Net.onState = (st, info) => {
-    if (st === 'waiting') lobbyStatus('Comparte este código con tu compañero. Esperando a que se una…');
-    else if (st === 'connecting') lobbyStatus('Conectando…');
+    const slot = info && info.slot;
+    if (st === 'waiting') lobbyStatus('Comparte este código con tus amigos (hasta 3). Esperando a que se unan…');
+    else if (st === 'connecting') { if (Net.role === 'guest') lobbyStatus('Conectando…'); }
     else if (st === 'open') {
-      Net.send(myHello());
-      lobbyStatus(lobby && lobby.role === 'host' ? 'Conectado. Preparando la sala…' : 'Conectado. Esperando al anfitrión…');
+      if (Net.role === 'host') { Net.sendTo(slot, myHello()); sendRoster(); }
+      else { Net.send(myHello()); lobbyStatus('Conectado. Esperando al anfitrión…'); }
     } else if (st === 'failed') {
       lobbyStatus('No se ha podido conectar. Puede que vuestras redes bloqueen la conexión directa: probad con otra red (por ejemplo, datos móviles).', true);
     } else if (st === 'error') {
       lobbyStatus('Error con la sala: ' + Cloud.message(info) + ' (revisa las reglas de Firestore, ver README).', true);
-    } else if (st === 'closed') onDisconnect();
+    } else if (st === 'closed') onDisconnect(slot);
   };
 
   addEventListener('resize', () => { if (G && G.online === 'guest') Net.send({ t: 'view', vw: VW, vh: VH }); });
@@ -2760,28 +2784,43 @@
     el.textContent = text;
     el.classList.toggle('err', !!err);
   }
+  // Lista de jugadores de la sala, en orden (J1 = anfitrión).
+  function hostRoster() {
+    const slots = Object.keys(lobby.remotes).sort();
+    return [{ name: myName(), char: S.char }, ...slots.map(k => ({ name: lobby.remotes[k].name, char: lobby.remotes[k].char }))];
+  }
+  function sendRoster() {
+    if (!lobby || lobby.role !== 'host') return;
+    Net.send({ t: 'roster', list: hostRoster() });
+    renderLobby();
+  }
   function renderLobby() {
-    const me = { name: myName(), char: S.char };
-    const host = lobby && lobby.role === 'host';
-    const rows = host ? [me, lobby.remote] : [lobby && lobby.remote, me];
-    $('lobbyPlayers').innerHTML = rows.map((r, i) =>
-      `<div class="lp" style="border-color:${PTEXT[i]}"><b style="color:${PTEXT[i]}">J${i + 1}${i === 0 ? ' · anfitrión' : ''}</b> ` +
-      (r ? `${esc(r.name)} — ${esc(charById(r.char).name)}` : '<span class="sub">esperando…</span>') + '</div>').join('');
-    $('lobbyStart').classList.toggle('hidden', !(host && lobby.remote && Net.open));
+    if (!lobby) return;
+    const host = lobby.role === 'host';
+    const rows = host ? hostRoster() : (lobby.roster || []);
+    const out = [];
+    for (let i = 0; i < Net.MAX_PLAYERS; i++) {
+      const r = rows[i];
+      out.push(`<div class="lp" style="border-color:${PTEXT[i]}"><b style="color:${PTEXT[i]}">J${i + 1}${i === 0 ? ' · anfitrión' : ''}</b> ` +
+        (r ? `${esc(r.name)} — ${esc(charById(r.char).name)}` : '<span class="sub">plaza libre…</span>') + '</div>');
+    }
+    $('lobbyPlayers').innerHTML = out.join('');
+    const guests = host ? Object.keys(lobby.remotes).length : 0;
+    $('lobbyStart').classList.toggle('hidden', !(host && guests > 0));
+    if (host && guests > 0 && !G) lobbyStatus(`Jugadores: ${guests + 1}/${Net.MAX_PLAYERS}. Pulsa «¡Comenzar!» cuando estéis listos, o espera a más amigos.`);
   }
 
-  function onHello(m) {
-    if (!lobby) lobby = { role: Net.role, remote: null };
-    lobby.remote = { name: String(m.name || 'Jugador').slice(0, 40), char: m.char, up: m.up || {}, gear: sanitizeGear(m.items, m.equip), vw: +m.vw || 0, vh: +m.vh || 0 };
-    renderLobby();
+  function onHello(m, slot) {
+    if (!lobby) lobby = { role: Net.role, remotes: {}, roster: [] };
     if (lobby.role === 'host') {
-      lobbyStatus(`¡${lobby.remote.name} se ha unido! Pulsa «¡Comenzar!» cuando estéis listos.`);
-      if (state === 'over' || state === 'win') $('retryBtn').classList.remove('hidden');
-    } else lobbyStatus(`Conectado con ${lobby.remote.name}. Esperando a que empiece la partida…`);
+      lobby.remotes[slot] = { name: String(m.name || 'Jugador').slice(0, 40), char: m.char, up: m.up || {}, gear: sanitizeGear(m.items, m.equip), vw: +m.vw || 0, vh: +m.vh || 0 };
+      sendRoster();
+      if ((state === 'over' || state === 'win') && lastOnline === 'host') $('retryBtn').classList.remove('hidden');
+    } else lobbyStatus(`Conectado con ${String(m.name || 'el anfitrión')}. Esperando a que empiece la partida…`);
   }
 
   async function hostRoom() {
-    lobby = { role: 'host', remote: null };
+    lobby = { role: 'host', remotes: {}, roster: [] };
     $('lobbyCode').classList.add('hidden');
     lobbyStatus('Creando sala…');
     renderLobby();
@@ -2804,7 +2843,7 @@
       Sound.play('error');
       return;
     }
-    lobby = { role: 'guest', remote: null };
+    lobby = { role: 'guest', remotes: {}, roster: [] };
     $('lobbyCode').textContent = code;
     $('lobbyCode').classList.remove('hidden');
     lobbyStatus('Buscando la sala…');
@@ -2815,47 +2854,65 @@
   }
 
   function hostStart() {
-    if (!Net.open || !lobby || !lobby.remote) return;
-    const r = lobby.remote;
+    if (!lobby) return;
+    const slots = Net.openSlots().filter(k => lobby.remotes[k]);
+    if (!slots.length) return;
+    // Ya no entra nadie más: se borra la sala y se cierran las plazas libres.
+    Net.closeRoom();
+    const rs = slots.map(k => lobby.remotes[k]);
     const online = {
-      map: S.map, chars: [S.char, charById(r.char).id], ups: [S.up, r.up], gears: [myGear(), r.gear],
-      names: [myName(), r.name], vw: r.vw, vh: r.vh,
+      map: S.map,
+      chars: [S.char, ...rs.map(r => charById(r.char).id)],
+      ups: [S.up, ...rs.map(r => r.up)],
+      gears: [myGear(), ...rs.map(r => r.gear)],
+      names: [myName(), ...rs.map(r => r.name)],
+      views: Object.fromEntries(slots.map(k => [k, { vw: lobby.remotes[k].vw, vh: lobby.remotes[k].vh }])),
     };
     Sound.init();
     newGame(online);
+    G.slotOf = [null, ...slots];
+    G.idxOf = Object.fromEntries(slots.map((k, i) => [k, i + 1]));
     lastOnline = 'host';
-    Net.send({ t: 'start', map: online.map, chars: online.chars, names: online.names });
+    slots.forEach((k, i) => Net.sendTo(k, { t: 'start', map: online.map, chars: online.chars, names: online.names, you: i + 1 }));
     beginPlay();
-    toast(`🌐 Jugando con ${r.name}` + (isTouch ? ' · arrastra el dedo para moverte' : ''), true);
+    toast(`🌐 Jugando con ${listNames(rs.map(r => r.name))}` + (isTouch ? ' · arrastra el dedo para moverte' : ''), true);
   }
 
-  function onDisconnect() {
+  function onDisconnect(slot) {
     const playing = G && G.online && !['over', 'win'].includes(state);
+    if (Net.role === 'host' && lobby) delete lobby.remotes[slot];
     if (playing && G.online === 'host') {
-      // Seguimos en solitario: se retira el personaje del invitado.
-      G.players = G.players.filter(p => p.idx === G.localIdx);
-      G.p = G.players[0];
-      G.online = null; G.coop = false;
-      toast('🔌 Tu compañero se ha desconectado. Sigues tú solo.');
-      if (state === 'levelup') { G.chooser = 0; openLevelUp(); }
+      // Ese jugador desaparece de la partida; el resto sigue.
+      const idx = G.idxOf[slot];
+      const p = idx != null && G.players[idx];
+      if (p && !p.gone) {
+        p.gone = true; p.down = true; p.hp = 0;
+        delete G.remote[idx]; delete G.views[slot];
+        toast(`🔌 ${G.names[idx]} se ha desconectado.`);
+        if (!alive().length) endGame(false);
+        else if (state === 'levelup' && G.chooserP && G.chooserP.idx === idx) { G.chooser = idx + 1; openLevelUp(); }
+      }
+      sendRoster();
     } else if (playing && G.online === 'guest') {
       state = 'over';
       releaseJoys(); Sound.stopMusic(); Sound.resume();
       $('endTitle').textContent = 'Conexión perdida';
-      $('endTitle').style.color = '#ff5c7a';
+      $('endTitle').style.color = '#d2607a';
       $('endStats').innerHTML = 'Se ha perdido la conexión con el anfitrión.';
       $('retryBtn').classList.add('hidden');
       $('pauseBtn').classList.add('hidden');
       showOnly('end');
+      lastOnline = null;
     } else if (state === 'over' || state === 'win') {
-      const w = $('endWait');
-      if (w) w.textContent = 'El anfitrión ha salido de la partida.';
-      if (lastOnline === 'host') $('retryBtn').classList.remove('hidden');
+      if (Net.role === 'guest') {
+        const w = $('endWait');
+        if (w) w.textContent = 'El anfitrión ha salido de la partida.';
+        lastOnline = null;
+      } else sendRoster();
     } else if (lobby) {
-      lobbyStatus('Tu compañero se ha desconectado.', true);
+      if (Net.role === 'host') { sendRoster(); lobbyStatus('Un jugador ha salido de la sala.', true); }
+      else lobbyStatus('Se ha perdido la conexión con la sala.', true);
     }
-    if (lobby) { lobby.remote = null; if (!$('lobby').classList.contains('hidden')) renderLobby(); }
-    lastOnline = null;
   }
 
   function leaveOnline() {
@@ -2884,7 +2941,11 @@
   // «Jugar otra vez»: en online, solo el anfitrión puede empezar la revancha.
   function retry() {
     if (lastOnline === 'guest') return;
-    if (lastOnline === 'host') { if (Net.open && lobby && lobby.remote) hostStart(); return; }
+    if (lastOnline === 'host') {
+      if (Net.openSlots().some(k => lobby && lobby.remotes[k])) hostStart();
+      else { leaveOnline(); start(); }
+      return;
+    }
     start();
   }
 
@@ -2994,7 +3055,7 @@
     const r = recordRun(win, t, map, base, G.players[0].stats.gold, G.bossKills);
     if (G.online === 'host') Net.send({ t: 'end', win, time: t, level: G.level, kills: G.kills, base, map: map.id, bossKills: G.bossKills });
     Object.assign(r, { t, level: G.level, kills: G.kills });
-    const who = G.online ? '🌐 Online: ' + G.names.map(esc).join(' y ') + '<br>'
+    const who = G.online ? '🌐 Online: ' + listNames(G.names) + '<br>'
       : G.coop ? '👥 Cooperativo: ' + G.players.map(p => esc(p.ch.name)).join(' y ') + '<br>' : '';
     showEnd(win, win ? '¡Victoria!' : (G.coop ? 'Habéis caído' : 'Has caído'), who, r);
   }

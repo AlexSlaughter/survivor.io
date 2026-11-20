@@ -5,13 +5,13 @@ service cloud.firestore {
     match /players/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
-    // Salas del cooperativo online: el anfitrión la crea y la borra; un invitado deja su respuesta.
+    // Salas del cooperativo online (hasta 4 jugadores): el anfitrión la crea y la borra.
     match /rooms/{code} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.resource.data.host == request.auth.uid;
+      // Los invitados ocupan plazas y dejan su respuesta; el anfitrión no puede cambiar.
       allow update: if request.auth != null
-        && request.resource.data.host == resource.data.host
-        && (!('guest' in resource.data) || resource.data.guest == request.auth.uid);
+        && request.resource.data.host == resource.data.host;
       allow delete: if request.auth != null && resource.data.host == request.auth.uid;
     }
   }

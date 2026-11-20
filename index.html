@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Horda Nocturna</title>
-  <link rel="stylesheet" href="style.css?v=202611201158">
+  <link rel="stylesheet" href="style.css?v=202611202309">
 </head>
 <body>
   <canvas id="game"></canvas>
@@ -56,7 +56,7 @@
         <li>🎒 En <b>Equipo</b> te pones un arma, casco, pecho, botas y amuleto. Se consiguen en <b>cofres con ruleta</b> (que se compran con oro) y como botín de los jefes, y se mejoran con oro.</li>
         <li>🪙 Gana oro en cada partida y gástalo en la <b>tienda</b>, en nuevos <b>personajes</b> y desbloquea <b>mapas</b> más difíciles.</li>
         <li>👥 <b>Cooperativo local</b>: J1 juega con WASD y J2 con las flechas, con un mando cada uno, o en una pantalla táctil (mitad izquierda J1, mitad derecha J2). Compartís nivel y oro, cada uno mejora sus propias armas por turnos y podéis reanimaros.</li>
-        <li>🌐 <b>Online</b>: con la sesión iniciada, uno crea una sala y el otro se une con su código de 5 letras. Cada uno juega en su dispositivo.</li>
+        <li>🌐 <b>Online</b>: con la sesión iniciada, uno crea una sala y hasta 3 amigos se unen con su código de 5 letras. Cada uno juega en su dispositivo.</li>
         <li>⏸ <b>P</b> / <b>Esc</b> / <b>Start</b> para pausar. Teclas <b>1-4</b> (o A/B/X/Y en el mando) para elegir mejoras.</li>
       </ul>
       <button class="back">Volver</button>
@@ -121,11 +121,11 @@
       <div id="maps" class="grid maps"></div>
       <div id="onlineBox" class="hidden">
         <div id="onlineNeedLogin" class="hidden">
-          <p class="sub">Para jugar online, los dos tenéis que <b>iniciar sesión</b> con vuestra cuenta.</p>
+          <p class="sub">Para jugar online, todos tenéis que <b>iniciar sesión</b> con vuestra cuenta.</p>
           <button id="onlineLoginBtn">👤 Iniciar sesión</button>
         </div>
         <div id="onlineActions" class="hidden">
-          <p class="sub">Uno crea la sala y le pasa el código al otro, que se une con él.</p>
+          <p class="sub">Uno crea la sala y pasa el código a sus amigos. <b>Hasta 4 jugadores.</b></p>
           <div class="onlinegrid">
             <button id="hostBtn" class="primary">🏠 Crear sala</button>
             <div class="joinrow">
@@ -242,11 +242,11 @@
     </div>
   </div>
 
-  <script src="firebase-config.js?v=202611201158"></script>
-  <script src="cloud.js?v=202611201158"></script>
-  <script src="net.js?v=202611201158"></script>
-  <script src="data.js?v=202611201158"></script>
-  <script src="audio.js?v=202611201158"></script>
-  <script src="game.js?v=202611201158"></script>
+  <script src="firebase-config.js?v=202611202309"></script>
+  <script src="cloud.js?v=202611202309"></script>
+  <script src="net.js?v=202611202309"></script>
+  <script src="data.js?v=202611202309"></script>
+  <script src="audio.js?v=202611202309"></script>
+  <script src="game.js?v=202611202309"></script>
 </body>
 </html>

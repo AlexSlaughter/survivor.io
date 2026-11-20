@@ -29,7 +29,7 @@ window.Cloud = (() => {
     'permission-denied': 'El servidor rechazó el guardado. Revisa las reglas de Firestore.',
     'unavailable': 'Sin conexión con el servidor. Se reintentará más tarde.',
     'room/not-found': 'No existe ninguna sala con ese código.',
-    'room/full': 'Esa sala ya tiene dos jugadores.',
+    'room/full': 'Esa sala ya está completa (4 jugadores).',
   };
   C.message = e => MSG[e && e.code] || ('Error: ' + ((e && (e.code || e.message)) || 'desconocido'));
 
@@ -87,7 +87,17 @@ window.Cloud = (() => {
   C.rooms = {
     create: (code, data) => fb.setDoc(room(code), Object.assign({}, data, { host: C.user.uid, created: fb.serverTimestamp() })),
     get: async code => { const s = await fb.getDoc(room(code)); return s.exists() ? s.data() : null; },
-    answer: (code, answer) => fb.updateDoc(room(code), { answer, guest: C.user.uid }),
+    // Ocupa la primera plaza libre de la sala de forma atómica (dos invitados no pueden quedarse la misma).
+    claim: code => fb.runTransaction(db, async tx => {
+      const snap = await tx.get(room(code));
+      if (!snap.exists()) throw Object.assign(new Error('No existe esa sala'), { code: 'room/not-found' });
+      const slots = snap.data().slots || {};
+      const k = ['1', '2', '3'].find(n => slots[n] && !slots[n].guest);
+      if (!k) throw Object.assign(new Error('Sala llena'), { code: 'room/full' });
+      tx.update(room(code), { [`slots.${k}.guest`]: C.user.uid });
+      return { slot: k, offer: slots[k].offer };
+    }),
+    answer: (code, slot, answer) => fb.updateDoc(room(code), { [`slots.${slot}.answer`]: answer }),
     watch: (code, cb) => fb.onSnapshot(room(code), s => cb(s.exists() ? s.data() : null), err => cb(null, err)),
     remove: code => fb.deleteDoc(room(code)),
   };

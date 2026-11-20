@@ -1,14 +1,18 @@
 'use strict';
 /*
- * Conexión online entre dos navegadores con WebRTC (canal de datos directo).
- * La "presentación" inicial (oferta y respuesta) se intercambia con un código de sala
- * guardado en Firestore; después, la partida va directamente de un navegador a otro.
+ * Conexión online con WebRTC (canales de datos directos), hasta 4 jugadores.
+ * El anfitrión abre una conexión por cada plaza de invitado (3 plazas). La "presentación"
+ * de cada plaza (oferta y respuesta) se intercambia con un código de sala en Firestore;
+ * después, la partida va directamente de un navegador a otro.
  */
 window.Net = (() => {
   const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
   const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const N = { role: null, code: null, open: false, onMessage: null, onState: null };
-  let pc = null, ch = null, unwatch = null, signal = null, roomLive = false, timeout = 0;
+  const SLOTS = ['1', '2', '3'];
+  const N = { role: null, code: null, slot: null, onMessage: null, onState: null };
+  // Anfitrión: una conexión por plaza. Invitado: una sola conexión (con el anfitrión).
+  let peers = {};
+  let unwatch = null, signal = null, roomLive = false, timeout = 0;
   const emit = (st, info) => { if (N.onState) N.onState(st, info); };
 
   // Espera a reunir los candidatos de conexión (como mucho unos segundos).
@@ -22,105 +26,133 @@ window.Net = (() => {
     });
   }
 
-  function lost() {
-    if (!N.open) return;
-    N.open = false;
-    emit('closed');
+  function newPeer(slot) {
+    const p = { slot, pc: new RTCPeerConnection({ iceServers: ICE }), ch: null, open: false };
+    p.pc.onconnectionstatechange = () => {
+      if (peers[slot] !== p) return;
+      const s = p.pc.connectionState;
+      if (s === 'failed' || s === 'closed') {
+        if (p.open) lost(p);
+        else if (N.role === 'guest') emit('failed');
+      }
+    };
+    peers[slot] = p;
+    return p;
   }
 
-  function setupChannel(c) {
-    ch = c;
-    ch.onopen = () => {
-      N.open = true;
-      clearTimeout(timeout);
-      removeRoom();
-      emit('open');
+  function lost(p) {
+    if (!p.open) return;
+    p.open = false;
+    emit('closed', { slot: p.slot });
+  }
+
+  function setupChannel(p, c) {
+    p.ch = c;
+    c.onopen = () => {
+      p.open = true;
+      if (N.role === 'guest') { clearTimeout(timeout); stopWatching(); }
+      emit('open', { slot: p.slot });
     };
-    ch.onclose = lost;
-    ch.onmessage = e => {
+    c.onclose = () => lost(p);
+    c.onmessage = e => {
       let m;
       try { m = JSON.parse(e.data); } catch (err) { return; }
-      if (N.onMessage) N.onMessage(m);
+      if (N.onMessage) N.onMessage(m, p.slot);
     };
   }
 
-  function newConnection() {
-    const c = new RTCPeerConnection({ iceServers: ICE });
-    c.onconnectionstatechange = () => {
-      if (c !== pc) return;
-      const s = c.connectionState;
-      if (s === 'failed' || s === 'closed') { if (N.open) lost(); else emit('failed'); }
-    };
-    // Si en 25 s no hay conexión, se avisa (redes que no permiten conexión directa).
-    timeout = setTimeout(() => { if (!N.open && c === pc) emit('failed'); }, 25000);
-    return c;
-  }
-
-  function removeRoom() {
+  function stopWatching() {
     if (unwatch) { try { unwatch(); } catch (e) { /* nada */ } unwatch = null; }
+  }
+  // Borra la sala (el anfitrión, al empezar la partida o al salir). Las plazas libres se cierran.
+  function closeRoom() {
+    stopWatching();
     if (roomLive && N.role === 'host' && N.code && signal) signal.remove(N.code).catch(() => {});
     roomLive = false;
+    if (N.role === 'host') {
+      for (const k of Object.keys(peers)) {
+        const p = peers[k];
+        if (!p.open) { try { p.pc.close(); } catch (e) { /* nada */ } delete peers[k]; }
+      }
+    }
   }
 
   function close() {
     clearTimeout(timeout);
-    removeRoom();
-    const wasOpen = N.open;
-    N.open = false;
-    if (ch) { ch.onclose = null; try { ch.close(); } catch (e) { /* nada */ } }
-    if (pc) { try { pc.close(); } catch (e) { /* nada */ } }
-    pc = null; ch = null;
-    N.role = null; N.code = null;
-    return wasOpen;
+    closeRoom();
+    for (const k of Object.keys(peers)) {
+      const p = peers[k];
+      if (p.ch) { p.ch.onclose = null; try { p.ch.close(); } catch (e) { /* nada */ } }
+      try { p.pc.close(); } catch (e) { /* nada */ }
+    }
+    peers = {};
+    N.role = null; N.code = null; N.slot = null;
   }
 
-  // Anfitrión: crea la sala y espera la respuesta del invitado.
+  // Anfitrión: crea la sala con 3 plazas y espera las respuestas de los invitados.
   N.host = async sig => {
     close();
     signal = sig; N.role = 'host';
     const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
-    const conn = pc = newConnection();
-    setupChannel(conn.createDataChannel('game', { ordered: true }));
-    await conn.setLocalDescription(await conn.createOffer());
-    await waitIce(conn);
-    if (conn !== pc) return null;
-    await sig.create(code, { offer: JSON.stringify(conn.localDescription) });
+    const slots = {};
+    await Promise.all(SLOTS.map(async k => {
+      const p = newPeer(k);
+      setupChannel(p, p.pc.createDataChannel('game', { ordered: true }));
+      await p.pc.setLocalDescription(await p.pc.createOffer());
+      await waitIce(p.pc);
+      slots[k] = { offer: JSON.stringify(p.pc.localDescription) };
+    }));
+    if (N.role !== 'host') return null;
+    await sig.create(code, { slots });
     N.code = code; roomLive = true;
     emit('waiting', code);
     unwatch = sig.watch(code, async (room, err) => {
       if (err) { emit('error', err); return; }
-      if (room && room.answer && conn === pc && !conn.currentRemoteDescription) {
-        try { await conn.setRemoteDescription(JSON.parse(room.answer)); emit('connecting'); }
-        catch (e) { emit('error', e); }
+      if (!room || !room.slots) return;
+      for (const k of SLOTS) {
+        const sl = room.slots[k], p = peers[k];
+        if (sl && sl.answer && p && !p.pc.currentRemoteDescription) {
+          try { await p.pc.setRemoteDescription(JSON.parse(sl.answer)); emit('connecting', { slot: k }); }
+          catch (e) { emit('error', e); }
+        }
       }
     });
     return code;
   };
 
-  // Invitado: lee la oferta de la sala y deja su respuesta.
+  // Invitado: ocupa una plaza libre, lee su oferta y deja la respuesta.
   N.join = async (sig, code) => {
     close();
     signal = sig; N.role = 'guest';
-    const room = await sig.get(code);
-    if (!room || !room.offer) throw Object.assign(new Error('No existe esa sala'), { code: 'room/not-found' });
-    if (room.answer) throw Object.assign(new Error('Sala llena'), { code: 'room/full' });
-    const conn = pc = newConnection();
-    conn.ondatachannel = e => setupChannel(e.channel);
-    await conn.setRemoteDescription(JSON.parse(room.offer));
-    await conn.setLocalDescription(await conn.createAnswer());
-    await waitIce(conn);
-    if (conn !== pc) return;
-    await sig.answer(code, JSON.stringify(conn.localDescription));
+    const { slot, offer } = await sig.claim(code);
+    N.slot = slot;
+    const p = newPeer(slot);
+    p.pc.ondatachannel = e => setupChannel(p, e.channel);
+    // Si en 25 s no hay conexión, se avisa (redes que no permiten conexión directa).
+    timeout = setTimeout(() => { if (!p.open && peers[slot] === p) emit('failed'); }, 25000);
+    await p.pc.setRemoteDescription(JSON.parse(offer));
+    await p.pc.setLocalDescription(await p.pc.createAnswer());
+    await waitIce(p.pc);
+    if (peers[slot] !== p) return;
+    await sig.answer(code, slot, JSON.stringify(p.pc.localDescription));
     N.code = code;
-    emit('connecting');
+    emit('connecting', { slot });
   };
 
-  N.send = m => {
-    if (!N.open || !ch || ch.readyState !== 'open') return false;
+  function sendPeer(p, m) {
+    if (!p || !p.open || !p.ch || p.ch.readyState !== 'open') return false;
     // Si el canal va saturado, se descartan instantáneas (llegará la siguiente).
-    if (m.t === 's' && ch.bufferedAmount > 512 * 1024) return false;
-    try { ch.send(JSON.stringify(m)); return true; } catch (e) { return false; }
-  };
+    if (m.t === 's' && p.ch.bufferedAmount > 512 * 1024) return false;
+    try { p.ch.send(JSON.stringify(m)); return true; } catch (e) { return false; }
+  }
+  // Anfitrión: a todos los invitados. Invitado: al anfitrión.
+  N.send = m => { let ok = false; for (const k in peers) ok = sendPeer(peers[k], m) || ok; return ok; };
+  N.sendTo = (slot, m) => sendPeer(peers[slot], m);
+  N.sendExcept = (slot, m) => { for (const k in peers) if (k !== slot) sendPeer(peers[k], m); };
+  N.openSlots = () => Object.keys(peers).filter(k => peers[k].open).sort();
+  Object.defineProperty(N, 'open', { get: () => Object.values(peers).some(p => p.open) });
+  N.closeRoom = closeRoom;
   N.close = close;
+  N.MAX_PLAYERS = SLOTS.length + 1;
   return N;
 })();

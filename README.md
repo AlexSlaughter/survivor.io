@@ -30,15 +30,15 @@ En la pantalla de selección, elige **👥 2 jugadores (local)** y un personaje 
 
 ### Cooperativo online
 
-Elige **🌐 Online** en la pantalla de selección. Los dos jugadores tienen que **iniciar sesión**.
+Elige **🌐 Online** en la pantalla de selección. **Hasta 4 jugadores**, y todos tienen que **iniciar sesión**.
 
 1. Uno pulsa **🏠 Crear sala**: aparece un **código de 5 letras**. Quien crea la sala elige el mapa.
-2. El otro escribe ese código y pulsa **🔗 Unirse**.
-3. Cuando el segundo jugador aparece en la sala, el anfitrión pulsa **¡Comenzar!**
+2. Los demás (hasta 3) escriben ese código y pulsan **🔗 Unirse**. Todos ven en la sala quién está dentro.
+3. El anfitrión pulsa **¡Comenzar!** cuando quiera, con 2, 3 o 4 jugadores.
 
-Funciona igual que el cooperativo local (nivel y oro compartidos, mejoras por turnos y reanimar), pero cada uno juega en su dispositivo con todos los controles. **Los dos ganáis oro** para vuestras cuentas. Si alguien pierde la conexión, el anfitrión sigue jugando solo.
+Funciona igual que el cooperativo local (nivel y oro compartidos, mejoras por turnos y reanimar), pero cada uno juega en su dispositivo con todos los controles. **Todos ganáis oro** para vuestras cuentas. Con más jugadores hay más enemigos y más resistentes, y se sube de nivel algo más rápido. Si alguien pierde la conexión, desaparece de la partida y el resto sigue.
 
-Cómo funciona por dentro: los dos navegadores se conectan directamente con **WebRTC**. Firebase solo se usa para intercambiar el código de la sala, y esa sala se borra al conectar. El anfitrión simula la partida y envía el estado unas 15 veces por segundo (hasta ~110 KB/s con la pantalla llena). El invitado mueve a su personaje en su propia pantalla, así no nota el retraso. Algunas redes muy restrictivas (por ejemplo, ciertas redes de empresa o universidad) no permiten la conexión directa; en ese caso, prueba con datos móviles.
+Cómo funciona por dentro: el anfitrión se conecta directamente con cada invitado por **WebRTC** (una conexión por plaza). Firebase solo se usa para intercambiar el código de la sala, y esa sala se borra al empezar la partida. El anfitrión simula la partida y envía el estado unas 15 veces por segundo (hasta ~110 KB/s con la pantalla llena). El invitado mueve a su personaje en su propia pantalla, así no nota el retraso. Algunas redes muy restrictivas (por ejemplo, ciertas redes de empresa o universidad) no permiten la conexión directa; en ese caso, prueba con datos móviles.
 
 ### Ataque principal (armas)
 
