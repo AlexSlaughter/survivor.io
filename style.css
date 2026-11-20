@@ -247,3 +247,31 @@ h2.p2, b.p2 { color: #ff6fb5; }
   .eqslot .ic { font-size: 24px; }
   .eqslot .lb { font-size: 10px; }
 }
+
+/* ---------- Cofres y ruleta ---------- */
+.chest { gap: 6px; }
+.chest .cic { font-size: 46px; line-height: 1.1; }
+.chest .rates { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px; font-size: 12px; font-weight: 700; }
+.chest button { width: 100%; margin: 6px 0 0; }
+.collection { margin: 6px 0 4px; font-size: 13px; color: #8f95c8; }
+.collection .icons { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 6px; font-size: 22px; }
+.collection .icons span { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 2px solid; background: #12162f; }
+.collection .icons span.no { filter: grayscale(1) brightness(.45); border-color: #343c84 !important; }
+.rou { position: relative; overflow: hidden; height: 128px; margin: 6px 0 14px; border-radius: 14px; background: #0e1128; border: 1px solid #2d3470; cursor: pointer; }
+.rou::before, .rou::after { content: ""; position: absolute; top: 0; bottom: 0; width: 60px; z-index: 2; pointer-events: none; }
+.rou::before { left: 0; background: linear-gradient(90deg, #0e1128, transparent); }
+.rou::after { right: 0; background: linear-gradient(-90deg, #0e1128, transparent); }
+.rou-pointer { position: absolute; left: 50%; top: 0; bottom: 0; width: 4px; transform: translateX(-50%); background: #ffd75e; z-index: 3; box-shadow: 0 0 12px #ffd75e; }
+.rou-pointer::before, .rou-pointer::after { content: ""; position: absolute; left: 50%; transform: translateX(-50%); border: 9px solid transparent; }
+.rou-pointer::before { top: 0; border-top-color: #ffd75e; }
+.rou-pointer::after { bottom: 0; border-bottom-color: #ffd75e; }
+.rou-strip { display: flex; height: 100%; align-items: center; will-change: transform; }
+.rou-cell { flex: 0 0 90px; height: 104px; margin: 0 4px; border-radius: 12px; border: 2px solid; background: #1c2148; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.rou-cell .i { font-size: 36px; }
+.rou-cell .n { font-size: 10px; text-align: center; line-height: 1.15; padding: 0 4px; color: #c7cbf0; }
+.rou-result { min-height: 96px; }
+.rou-result .big { font-size: 54px; animation: pop .45s ease-out; }
+.rou-result .rn { font-size: 20px; font-weight: 800; }
+.rou-result .rs { font-size: 14px; color: #c7cbf0; margin-top: 4px; }
+@keyframes pop { 0% { transform: scale(.2); opacity: 0; } 70% { transform: scale(1.2); } 100% { transform: scale(1); opacity: 1; } }
+button:disabled { opacity: .45; cursor: default; filter: grayscale(.4); }

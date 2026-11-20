@@ -4,7 +4,7 @@ window.HN_DATA = {
   WEAPONS: {
     chispa: {
       name: 'Chispa Arcana', icon: '✨', desc: 'Dispara al enemigo más cercano.',
-      up: ['+1 proyectil', 'Más daño y recarga más rápida', 'Atraviesa enemigos', '+1 proyectil y más daño'],
+      up: ['+1 proyectil', 'Más daño y recarga más rápida', 'Atraviesa enemigos', '+1 proyectil'],
       evo: 'tomo', evoName: 'Tormenta Arcana',
     },
     orbe: {
@@ -47,8 +47,8 @@ window.HN_DATA = {
   },
 
   BOSSES: [
-    { at: 300, name: 'Coloso de Obsidiana', hp: 2600, r: 38, speed: 52, dmg: 25, color: '#8a5cff', shots: 12, final: false },
-    { at: 600, name: 'Rey del Abismo',      hp: 9000, r: 48, speed: 60, dmg: 35, color: '#ff3d7f', shots: 18, final: true },
+    { at: 300, name: 'Coloso de Obsidiana', hp: 5000, r: 38, speed: 52, dmg: 25, color: '#8a5cff', shots: 12, final: false },
+    { at: 600, name: 'Rey del Abismo',      hp: 20000, r: 48, speed: 60, dmg: 35, color: '#ff3d7f', shots: 18, final: true },
   ],
 
   CHARS: [
@@ -155,6 +155,12 @@ window.HN_DATA = {
     regen: ['vida/s', v => '+' + (Math.round(v * 10) / 10)],
   },
   ITEM_MAX: 5,
+  // Cofres de la ruleta: probabilidad (en %) de cada rareza.
+  CHESTS: [
+    { id: 'madera', name: 'Cofre de Madera', icon: '📦', price: 200,  rates: { comun: 70, raro: 25, epico: 5,  legendario: 0 } },
+    { id: 'plata',  name: 'Cofre de Plata',  icon: '🎁', price: 600,  rates: { comun: 30, raro: 50, epico: 17, legendario: 3 } },
+    { id: 'oro',    name: 'Cofre Dorado',    icon: '💰', price: 1500, rates: { comun: 0,  raro: 40, epico: 45, legendario: 15 } },
+  ],
 
   SHOP: [
     { id: 'poder',       name: 'Poder',      icon: '⚔️', desc: '+5% de daño',                  max: 5, cost: 60 },

@@ -4,7 +4,7 @@
  * HTML5 Canvas + JavaScript puro, sin dependencias.
  */
 (() => {
-  const { WEAPONS, PASSIVES, ETYPES, BOSSES, CHARS, MAPS, SHOP, RARITY, EQUIP_SLOTS, ITEMS, STAT_LABELS, ITEM_MAX } = window.HN_DATA;
+  const { WEAPONS, PASSIVES, ETYPES, BOSSES, CHARS, MAPS, SHOP, RARITY, EQUIP_SLOTS, ITEMS, STAT_LABELS, ITEM_MAX, CHESTS } = window.HN_DATA;
   const itemById = id => ITEMS.find(it => it.id === id);
   const TAU = Math.PI * 2;
   const canvas = document.getElementById('game');
@@ -542,8 +542,8 @@
       const n = (ev ? 4 : [1, 2, 2, 2, 3][lv - 1]) + s.proj;
       const targets = nearest(p.x, p.y, n, 520);
       if (!targets.length) { w.t = 0.15; return; }
-      w.t = (ev ? 0.45 : 1.15 - lv * 0.08) * s.cd;
-      const dmg = (9 + 4 * lv + (lv >= 5 ? 6 : 0)) * (ev ? 1.6 : 1) * s.dmg;
+      w.t = (ev ? 0.55 : 1.1 - lv * 0.07) * s.cd;
+      const dmg = (10 + 4 * lv) * (ev ? 1.8 : 1) * s.dmg;
       const spd = ev ? 560 : 440;
       for (let i = 0; i < n; i++) {
         const t = targets[i % targets.length];
@@ -561,8 +561,8 @@
       w.n = (ev ? 6 : [1, 2, 3, 3, 4][lv - 1]) + s.proj;
       w.R = (ev ? 100 : 66 + lv * 4 + (lv >= 4 ? 8 : 0)) * s.area;
       w.br = (ev ? 13 : 10) * Math.sqrt(s.area);
-      w.angle += (ev ? 4.2 : 3.2) * dt;
-      const dmg = (8 + 3 * lv) * (ev ? 2 : 1) * s.dmg;
+      w.angle += (ev ? 4.4 : 3.6) * dt;
+      const dmg = (10 + 4 * lv) * (ev ? 2.2 : 1) * s.dmg;
       for (let i = 0; i < w.n; i++) {
         const a = w.angle + i / w.n * TAU;
         const bx = p.x + Math.cos(a) * w.R, by = p.y + Math.sin(a) * w.R;
@@ -581,7 +581,7 @@
       w.t -= dt;
       if (w.t > 0) return;
       w.t = 0.5 * s.cd;
-      const dmg = (3 + 2 * lv) * (ev ? 2.2 : 1) * s.dmg;
+      const dmg = (2 + 3 * lv) * (ev ? 3 : 1) * s.dmg;
       query(p.x, p.y, w.R, e => hurt(e, dmg));
     },
     rayo(w, dt, p, s) {
@@ -590,9 +590,9 @@
       const lv = w.lvl, ev = w.evolved;
       const vis = G.enemies.filter(e => !e.dead && Math.abs(e.x - p.x) < VW / 2 + 20 && Math.abs(e.y - p.y) < VH / 2 + 20);
       if (!vis.length) { w.t = 0.3; return; }
-      w.t = (2.3 - lv * 0.18) * s.cd * (ev ? 0.55 : 1);
-      const n = (ev ? lv + 2 : [1, 1, 2, 2, 3][lv - 1]) + s.proj;
-      const dmg = (20 + 10 * lv) * (ev ? 1.6 : 1) * s.dmg;
+      w.t = (2.3 - lv * 0.18) * s.cd * (ev ? 0.7 : 1);
+      const n = (ev ? 5 : [1, 1, 2, 2, 3][lv - 1]) + s.proj;
+      const dmg = (14 + 8 * lv) * (ev ? 1.2 : 1) * s.dmg;
       const R = 38 * s.area * (ev ? 1.5 : 1);
       shuffle(vis);
       for (let i = 0; i < n; i++) {
@@ -612,7 +612,7 @@
       w.t = (2.0 - lv * 0.12 - (lv >= 4 ? 0.15 : 0)) * s.cd * (ev ? 0.8 : 1);
       const n = (ev ? 4 : [1, 1, 2, 2, 3][lv - 1]) + s.proj;
       const base = Math.atan2(p.face.y, p.face.x);
-      const dmg = (10 + 5 * lv) * (ev ? 1.8 : 1) * s.dmg;
+      const dmg = (8 + 4 * lv) * (ev ? 1.4 : 1) * s.dmg;
       const r = 12 * s.area * (ev ? 1.5 : 1);
       for (let i = 0; i < n; i++) {
         const a = ev ? base + i / n * TAU : base + (i - (n - 1) / 2) * 0.35;
@@ -773,10 +773,13 @@
   function spawnEnemy(type, m = {}) {
     const t = ETYPES[type], map = G.map;
     const [x, y] = m.pos || spawnPos();
-    const hs = (1 + G.time / 60 * 0.45) * map.hp * G.diffHp;
+    // Vida: x4,3 a los 5 min y x10 a los 10 min. Daño: +10% por minuto.
+    const mins = G.time / 60;
+    const hs = (1 + mins * 0.4 + mins * mins * 0.05) * map.hp * G.diffHp;
+    const ds = 1 + mins * 0.1;
     const e = {
       x, y, type, r: t.r * (m.size || 1), hp: t.hp * hs * (m.hp || 1), speed: t.speed * map.speed * (m.speed || 1),
-      dmg: t.dmg * (m.dmg || 1), xp: t.xp * (m.xp || 1), color: map.colors[type],
+      dmg: t.dmg * ds * (m.dmg || 1), xp: t.xp * (m.xp || 1), color: map.colors[type],
       flash: 0, kx: 0, ky: 0, slow: 0, elite: !!m.elite, boss: false, wob: rand(0, TAU),
     };
     e.maxHp = e.hp;
@@ -929,13 +932,13 @@
     e.phase += 0.3;
     for (let i = 0; i < e.shots; i++) {
       const a = i / e.shots * TAU + e.phase;
-      G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160, r: 7, dmg: 12, life: 5, color: e.color });
+      G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160, r: 7, dmg: e.final ? 18 : 12, life: 5, color: e.color });
     }
     const tg = nearestPlayer(e.x, e.y);
     if (e.final && tg) {
       const a = Math.atan2(tg.y - e.y, tg.x - e.x);
       for (let i = -1; i <= 1; i++) {
-        G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(a + i * 0.15) * 230, vy: Math.sin(a + i * 0.15) * 230, r: 8, dmg: 15, life: 4, color: '#ffd75e' });
+        G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(a + i * 0.15) * 230, vy: Math.sin(a + i * 0.15) * 230, r: 8, dmg: 22, life: 4, color: '#ffd75e' });
       }
     }
   }
@@ -1573,7 +1576,7 @@
   }
 
   // ---------- Menús ----------
-  const overlays = ['menu', 'help', 'account', 'select', 'shop', 'equip', 'lobby', 'levelup', 'pause', 'end'];
+  const overlays = ['menu', 'help', 'account', 'select', 'shop', 'equip', 'roulette', 'lobby', 'levelup', 'pause', 'end'];
   function showOnly(id) { for (const o of overlays) $(o).classList.toggle('hidden', o !== id); }
 
   function refreshGold() { document.querySelectorAll('.goldAmt').forEach(el => { el.textContent = S.gold; }); }
@@ -1674,9 +1677,8 @@
     }
   }
 
-  // ---------- Equipo y Armería ----------
+  // ---------- Equipo y cofres ----------
   let eqTab = 'inv', eqReturn = 'menu';
-  const buyCost = it => RARITY[it.rarity].price;
   const upCost = (it, lvl) => Math.round(RARITY[it.rarity].price * 0.4 * lvl);
   function fmtStats(stats, lvl) {
     return Object.keys(stats).map(k => `${STAT_LABELS[k][1](itemValue(stats[k], lvl))} ${STAT_LABELS[k][0]}`).join(' · ');
@@ -1711,10 +1713,11 @@
 
     const box = $('eqList');
     box.innerHTML = '';
+    if (eqTab === 'chests') { renderChests(box); return; }
     const order = it => EQUIP_SLOTS.findIndex(sl => sl.id === it.slot) * 10 + Object.keys(RARITY).indexOf(it.rarity);
-    const list = ITEMS.filter(it => (eqTab === 'inv') === !!S.items[it.id]).sort((a, b) => order(a) - order(b));
+    const list = ITEMS.filter(it => !!S.items[it.id]).sort((a, b) => order(a) - order(b));
     if (!list.length) {
-      box.innerHTML = `<p class="sub">${eqTab === 'inv' ? 'Aún no tienes objetos. Cómpralos en la ⚒️ Armería o derrota jefes para conseguir botín.' : '¡Ya tienes todos los objetos de la Armería!'}</p>`;
+      box.innerHTML = '<p class="sub">Aún no tienes objetos. Ábrelos en los 🎰 Cofres o derrota jefes para conseguir botín.</p>';
     }
     for (const it of list) {
       const rar = RARITY[it.rarity], lvl = S.items[it.id] || 0, slot = EQUIP_SLOTS.find(sl => sl.id === it.slot);
@@ -1730,18 +1733,7 @@
       const btns = document.createElement('div');
       btns.className = 'btns';
       const mk = (text, cls, fn) => { const b = document.createElement('button'); b.textContent = text; if (cls) b.className = cls; b.addEventListener('click', fn); btns.appendChild(b); return b; };
-      if (!lvl) {
-        const cost = buyCost(it);
-        const b = mk(`🪙 ${cost}`, 'primary', () => {
-          if (S.gold < cost) { bump(d); eqMsg('No tienes oro suficiente.', true); return; }
-          S.gold -= cost; S.items[it.id] = 1;
-          if (!S.equip[it.slot]) S.equip[it.slot] = it.id;
-          save(); Sound.play('buy');
-          eqMsg(`✔ Has comprado ${it.name}` + (S.equip[it.slot] === it.id ? ' y te lo has equipado.' : '. Equípatelo en «Mis objetos».'));
-          renderEquip();
-        });
-        if (S.gold < cost) b.style.opacity = '.6';
-      } else {
+      {
         mk(on ? 'Quitar' : 'Equipar', on ? '' : 'primary', () => {
           if (on) delete S.equip[it.slot]; else S.equip[it.slot] = it.id;
           save(); Sound.play('click'); eqMsg(''); renderEquip();
@@ -1762,6 +1754,131 @@
       box.appendChild(d);
     }
   }
+  // Pestaña de cofres: los objetos solo se consiguen al azar, nunca comprándolos directamente.
+  function renderChests(box) {
+    const owned = ITEMS.filter(it => S.items[it.id]).length;
+    const col = document.createElement('div');
+    col.className = 'collection';
+    col.style.gridColumn = '1 / -1';
+    col.innerHTML = `Colección: <b>${owned}/${ITEMS.length}</b> objetos` +
+      `<div class="icons">${ITEMS.map(it => `<span class="${S.items[it.id] ? '' : 'no'}" style="border-color:${RARITY[it.rarity].color}" title="${S.items[it.id] ? it.name : '???'}">${it.icon}</span>`).join('')}</div>`;
+    box.appendChild(col);
+    for (const ch of CHESTS) {
+      const d = document.createElement('div');
+      d.className = 'sel chest';
+      d.innerHTML = `<div class="cic">${ch.icon}</div><div class="nm">${ch.name}</div><div class="rates">` +
+        Object.keys(ch.rates).filter(r => ch.rates[r] > 0).map(r => `<span style="color:${RARITY[r].color}">${RARITY[r].name} ${ch.rates[r]}%</span>`).join('') + '</div>';
+      const b = document.createElement('button');
+      b.className = 'primary';
+      b.textContent = `Abrir · 🪙 ${ch.price}`;
+      if (S.gold < ch.price) b.style.opacity = '.6';
+      b.addEventListener('click', () => openChestRoulette(ch, d));
+      d.appendChild(b);
+      box.appendChild(d);
+    }
+    const note = document.createElement('p');
+    note.className = 'sub';
+    note.style.gridColumn = '1 / -1';
+    note.textContent = 'Si te toca un objeto que ya tienes, sube de nivel. Si ya estaba al máximo, recibes oro a cambio.';
+    box.appendChild(note);
+  }
+
+  function rollRarity(rates) {
+    const keys = Object.keys(rates).filter(k => rates[k] > 0);
+    let r = Math.random() * keys.reduce((a, k) => a + rates[k], 0);
+    for (const k of keys) { r -= rates[k]; if (r <= 0) return k; }
+    return keys[keys.length - 1];
+  }
+  function rollItem(rates) {
+    const rar = rollRarity(rates);
+    return pick(ITEMS.filter(it => it.rarity === rar));
+  }
+  // Añade el objeto: nuevo (y se equipa si el hueco estaba libre), sube de nivel o, si ya está al máximo, da oro.
+  function grantItem(it) {
+    const had = S.items[it.id] || 0;
+    if (had >= ITEM_MAX) {
+      const gold = Math.round(RARITY[it.rarity].price * 0.25);
+      S.gold += gold;
+      return { kind: 'gold', gold };
+    }
+    S.items[it.id] = had + 1;
+    let equipped = false;
+    if (!had && !S.equip[it.slot]) { S.equip[it.slot] = it.id; equipped = true; }
+    return { kind: had ? 'up' : 'new', lvl: had + 1, equipped };
+  }
+
+  // ---------- Ruleta ----------
+  const ROU_CELL = 98, ROU_N = 42, ROU_WIN = 36;
+  let rou = null;
+  function openChestRoulette(ch, card) {
+    if (rou && !rou.done) return;
+    if (S.gold < ch.price) { bump(card); eqMsg('No tienes oro suficiente para este cofre.', true); return; }
+    Sound.init();
+    // El resultado se decide y se guarda antes de la animación: cerrar a medias no pierde nada.
+    S.gold -= ch.price;
+    const it = rollItem(ch.rates), res = grantItem(it);
+    save();
+    refreshGold();
+    rou = { ch, it, res, done: false };
+    $('rouTitle').textContent = `${ch.icon} ${ch.name}`;
+    $('rouResult').innerHTML = '';
+    $('rouAgain').disabled = true;
+    $('rouAgain').textContent = `Abrir otro · 🪙 ${ch.price}`;
+    const strip = $('rouStrip');
+    strip.innerHTML = '';
+    for (let i = 0; i < ROU_N; i++) {
+      const c = i === ROU_WIN ? it : rollItem(ch.rates);
+      const el = document.createElement('div');
+      el.className = 'rou-cell';
+      el.style.borderColor = RARITY[c.rarity].color;
+      el.style.boxShadow = `inset 0 0 18px ${RARITY[c.rarity].color}33`;
+      el.innerHTML = `<span class="i">${c.icon}</span><span class="n">${c.name}</span>`;
+      strip.appendChild(el);
+    }
+    showOnly('roulette');
+    strip.style.transition = 'none';
+    strip.style.transform = 'translateX(0px)';
+    void strip.offsetWidth;
+    const w = $('rouWin').clientWidth;
+    rou.target = w / 2 - (ROU_WIN * ROU_CELL + ROU_CELL / 2) + rand(-32, 32);
+    strip.style.transition = 'transform 4.2s cubic-bezier(.1,.72,.12,1)';
+    strip.style.transform = `translateX(${rou.target}px)`;
+    // Un "tic" cada vez que una casilla pasa por la flecha.
+    let lastCell = -1;
+    const tick = () => {
+      if (!rou || rou.done) return;
+      const x = new DOMMatrixReadOnly(getComputedStyle(strip).transform).m41;
+      const cell = Math.floor((w / 2 - x) / ROU_CELL);
+      if (cell !== lastCell) { lastCell = cell; Sound.play('tick', 0.02); }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    rou.timer = setTimeout(revealRoulette, 4300);
+    strip.addEventListener('transitionend', revealRoulette, { once: true });
+  }
+
+  function revealRoulette() {
+    if (!rou || rou.done) return;
+    rou.done = true;
+    clearTimeout(rou.timer);
+    const strip = $('rouStrip');
+    strip.style.transition = 'none';
+    strip.style.transform = `translateX(${rou.target}px)`;
+    const { it, res, ch } = rou, rar = RARITY[it.rarity];
+    const cells = strip.children;
+    if (cells[ROU_WIN]) { cells[ROU_WIN].style.transform = 'scale(1.08)'; cells[ROU_WIN].style.boxShadow = `0 0 24px ${rar.color}`; }
+    const status = res.kind === 'new' ? `¡NUEVO!${res.equipped ? ' Te lo has equipado.' : ''}`
+      : res.kind === 'up' ? `Ya lo tenías: sube a nivel ${res.lvl}`
+      : `Ya estaba al máximo: recibes 🪙 ${res.gold}`;
+    $('rouResult').innerHTML = `<div class="big">${it.icon}</div><div class="rn" style="color:${rar.color}">${it.name}</div>` +
+      `<div class="rs"><b style="color:${rar.color}">${rar.name}</b> · ${status}</div>` +
+      `<div class="rs">${fmtStats(it.stats, Math.max(1, S.items[it.id] || 1))}${it.weapon ? ` · Ataque básico: ${WEAPONS[it.weapon].icon} ${WEAPONS[it.weapon].name}` : ''}</div>`;
+    Sound.play(it.rarity === 'legendario' || it.rarity === 'epico' ? 'evolve' : 'chest');
+    $('rouAgain').disabled = false;
+    $('rouAgain').style.opacity = S.gold >= ch.price ? '' : '.6';
+    refreshGold();
+  }
+
   function openEquip(from) { eqReturn = from; eqMsg(''); renderEquip(); showOnly('equip'); }
 
   function renderEqNote() {
@@ -2027,7 +2144,7 @@
     }
     for (const p of G.players) {
       if (p.idx !== G.localIdx) { p.x = p.px + (p.tx - p.px) * k; p.y = p.py + (p.ty - p.py) * k; }
-      for (const w of p.weapons) if (w.id === 'orbe') w.angle += (w.evolved ? 4.2 : 3.2) * dt;
+      for (const w of p.weapons) if (w.id === 'orbe') w.angle += (w.evolved ? 4.4 : 3.6) * dt;
     }
     for (const b of G.bullets) { b.x += b.vx * dt; b.y += b.vy * dt; b.rot += dt * 18; }
     for (const b of G.ebullets) { b.x += b.vx * dt; b.y += b.vy * dt; }
@@ -2334,10 +2451,8 @@
       const total = pool.reduce((a, it) => a + RARITY[it.rarity].w, 0);
       let r = Math.random() * total, it = pool[0];
       for (const c of pool) { r -= RARITY[c.rarity].w; if (r <= 0) { it = c; break; } }
-      const had = S.items[it.id] || 0;
-      if (had >= ITEM_MAX) continue;
-      S.items[it.id] = had + 1;
-      got.push({ it, up: had > 0 });
+      const res = grantItem(it);
+      got.push({ it, up: res.kind === 'up', gold: res.gold });
     }
     return got;
   }
@@ -2362,7 +2477,7 @@
       `Tiempo: <b>${fmtTime(r.t)}</b>${r.record ? ' 🏆' : ''}<br>Nivel: <b>${r.level}</b> · Enemigos: <b>${r.kills}</b><br>` +
       `Oro ganado: <b>🪙 ${r.earned}</b> (total ${S.gold})` +
       r.newMaps.map(m => `<br><span class="unlock">¡Nuevo mapa desbloqueado: ${m.emoji} ${m.name}!</span>`).join('') +
-      (r.loot || []).map(l => `<br><span class="unlock">🎁 Botín: <span style="color:${RARITY[l.it.rarity].color}">${l.it.icon} ${l.it.name}</span>${l.up ? ' (sube de nivel)' : ''}</span>`).join('') +
+      (r.loot || []).map(l => `<br><span class="unlock">🎁 Botín: <span style="color:${RARITY[l.it.rarity].color}">${l.it.icon} ${l.it.name}</span>${l.up ? ' (sube de nivel)' : l.gold ? ` (ya al máximo: +${l.gold} 🪙)` : ''}</span>`).join('') +
       (extra || '');
     $('pauseBtn').classList.add('hidden');
     showOnly('end');
@@ -2389,6 +2504,9 @@
   click('playBtn', () => { renderSelect(); showOnly('select'); });
   click('shopBtn', () => { renderShop(); showOnly('shop'); });
   click('equipBtn', () => openEquip('menu'));
+  $('rouWin').addEventListener('click', revealRoulette);
+  click('rouBack', () => { revealRoulette(); eqTab = 'chests'; eqMsg(''); renderEquip(); showOnly('equip'); });
+  click('rouAgain', () => { if (rou) openChestRoulette(rou.ch, $('rouAgain')); });
   click('eqBack', () => { if (eqReturn === 'select') { renderSelect(); showOnly('select'); } else openMenu(); });
   document.querySelectorAll('#eqTabs button').forEach(b => b.addEventListener('click', () => {
     Sound.play('click'); eqTab = b.dataset.t; eqMsg(''); renderEquip();

@@ -63,6 +63,7 @@ window.Sound = (() => {
     coin:   () => { tone(1320, { type: 'square', d: 0.06, v: 0.05 }); tone(1760, { type: 'square', d: 0.12, v: 0.05, t: 0.06 }); },
     level:  () => seq([523, 659, 784, 1047], 0.07, { type: 'triangle', d: 0.2, v: 0.15 }),
     click:  () => tone(700, { type: 'triangle', d: 0.05, v: 0.1 }),
+    tick:   () => tone(1900, { type: 'square', d: 0.025, v: 0.045 }),
     hurt:   () => { tone(220, { f2: 70, type: 'sawtooth', d: 0.22, v: 0.18 }); noise({ d: 0.12, v: 0.14, freq: 900 }); },
     chest:  () => seq([392, 523, 659, 784, 1047], 0.06, { type: 'square', d: 0.15, v: 0.07 }),
     evolve: () => { seq([523, 659, 784, 1047, 1319, 1568], 0.08, { type: 'triangle', d: 0.3, v: 0.14 }); noise({ d: 0.6, v: 0.08, freq: 5000, ftype: 'highpass', t: 0.1 }); },

@@ -52,6 +52,20 @@ Cómo funciona por dentro: los dos navegadores se conectan directamente con **We
 
 Objetos pasivos extra: 👢 Botas Veloces (velocidad) e 🧲 Imán Lunar (radio de recogida).
 
+### Equilibrio de daño
+
+Daño por segundo aproximado a cada enemigo, sin bonificaciones. Las armas de área y cuerpo a cuerpo hacen menos por enemigo porque golpean a muchos a la vez.
+
+| Arma | Nv1 | Nv3 | Nv5 | Evolucionada |
+|---|---|---|---|---|
+| ✨ Chispa (un objetivo) | 14 | 49 | 120 | 393 |
+| 🥏 Disco (atraviesa) | 13 | 49 | 134 | 314 |
+| ⚡ Rayo (área) | 10 | 43 | 116 | 331 |
+| 🌀 Cuchillas (cuerpo a cuerpo) | 8 | 38 | 69 | 165 |
+| 🔥 Halo (todo alrededor) | 10 | 22 | 34 | 102 (y ralentiza) |
+
+Los enemigos ganan vida cada vez más rápido (×4 a los 5 minutos y ×10 a los 10) y +10% de daño por minuto. Jefes: Coloso de Obsidiana 5000 de vida y Rey del Abismo 20000.
+
 ### Personajes
 
 Se desbloquean con oro en la pantalla de selección.
@@ -64,13 +78,19 @@ Se desbloquean con oro en la pantalla de selección.
 | Vulcan, Piromante | 🔥 Halo Ardiente | +15% daño, +10% área, -20 vida | 🪙 600 |
 | Nova, Tormenta | ⚡ Rayo Celeste | -12% recarga, +1 vida/s | 🪙 900 |
 
-### Equipo y Armería
+### Equipo y cofres
 
 En **🎒 Equipo** tienes 5 huecos: **arma**, **casco**, **pecho**, **botas** y **amuleto**.
 
 - **El arma equipada sustituye al ataque básico** del personaje (por ejemplo, Aria con el *Cetro de Tormenta* empieza con Rayo Celeste) y además da una bonificación.
 - Los objetos tienen rareza (**común**, **raro**, **épico** y **legendario**) y se **mejoran con oro** hasta nivel 5. Cada nivel añade un 50% de la bonificación base.
-- Se compran en la **⚒️ Armería** o se consiguen como **🎁 botín**: cada jefe derrotado tiene un 50% de soltar un objeto (los legendarios solo si ganas la partida). Si ya lo tenías, sube de nivel.
+- **No se compran directamente**: salen en **🎰 cofres con ruleta**, que se compran con oro, o como **🎁 botín** (cada jefe derrotado tiene un 50% de soltar un objeto; los legendarios solo si ganas la partida). Si te toca uno que ya tienes, sube de nivel, y si ya estaba al máximo recibes oro.
+
+| Cofre | Precio | Común | Raro | Épico | Legendario |
+|---|---|---|---|---|---|
+| 📦 Madera | 200 | 70% | 25% | 5% | — |
+| 🎁 Plata | 600 | 30% | 50% | 17% | 3% |
+| 💰 Dorado | 1500 | — | 40% | 45% | 15% |
 - En cooperativo local el equipo lo lleva J1. En online, cada jugador lleva el suyo.
 
 | Hueco | Objetos |

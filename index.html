@@ -51,7 +51,7 @@
         <li>🎮 Muévete con <b>WASD</b> / <b>flechas</b> o arrastrando el dedo por la pantalla.</li>
         <li>✨ Tus armas atacan solas. Recoge cristales para subir de nivel y elige mejoras.</li>
         <li>⭐ Lleva un arma a <b>Nv. 5</b>, consigue su objeto clave y abre un <b>cofre</b> (lo sueltan élites y jefes) para <b>evolucionarla</b>.</li>
-        <li>🎒 En <b>Equipo</b> te pones un arma principal (que sustituye al ataque básico del personaje), casco, pecho, botas y amuleto. Se compran en la <b>Armería</b>, se mejoran con oro y los jefes pueden soltarlos como botín.</li>
+        <li>🎒 En <b>Equipo</b> te pones un arma principal (que sustituye al ataque básico del personaje), casco, pecho, botas y amuleto. Se consiguen en <b>cofres con ruleta</b> (que se compran con oro) y como botín de los jefes, y se mejoran con oro.</li>
         <li>🪙 Gana oro en cada partida y gástalo en la <b>tienda</b>, en nuevos <b>personajes</b> y desbloquea <b>mapas</b> más difíciles.</li>
         <li>👥 <b>Cooperativo local</b>: J1 juega con WASD y J2 con las flechas, con un mando cada uno, o en una pantalla táctil (mitad izquierda J1, mitad derecha J2). Compartís nivel y oro, cada uno mejora sus propias armas por turnos y podéis reanimaros.</li>
         <li>🌐 <b>Online</b>: con la sesión iniciada, uno crea una sala y el otro se une con su código de 5 letras. Cada uno juega en su dispositivo.</li>
@@ -141,7 +141,24 @@
     </div>
   </div>
 
-  <!-- Equipo y Armería -->
+  <!-- Ruleta de cofres -->
+  <div id="roulette" class="overlay hidden">
+    <div class="panel wide">
+      <div class="topbar"><span class="gold">🪙 <b class="goldAmt">0</b></span></div>
+      <h2 id="rouTitle">Cofre</h2>
+      <div id="rouWin" class="rou" title="Toca para saltar la animación">
+        <div class="rou-pointer"></div>
+        <div id="rouStrip" class="rou-strip"></div>
+      </div>
+      <div id="rouResult" class="rou-result"></div>
+      <div class="actions">
+        <button id="rouBack">Volver</button>
+        <button id="rouAgain" class="primary">Abrir otro</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Equipo y cofres -->
   <div id="equip" class="overlay hidden">
     <div class="panel wide">
       <div class="topbar"><span class="gold">🪙 <b class="goldAmt">0</b></span></div>
@@ -150,7 +167,7 @@
       <p id="eqSummary" class="sub"></p>
       <div id="eqTabs" class="seg">
         <button data-t="inv">Mis objetos</button>
-        <button data-t="shop">⚒️ Armería</button>
+        <button data-t="chests">🎰 Cofres</button>
       </div>
       <div id="eqList" class="grid shopgrid"></div>
       <p id="eqMsg" class="msg"></p>
