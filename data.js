@@ -29,6 +29,39 @@ window.HN_DATA = {
     },
   },
 
+  // Armas principales: el ataque principal de cualquier personaje. Todos empiezan con el básico;
+  // las demás salen en la ruleta de cofres y se equipan en el hueco de arma.
+  MAIN_WEAPONS: {
+    basico: {
+      name: 'Pistola', icon: '🔫', desc: 'Ataque básico: dispara al enemigo más cercano.',
+      up: ['Más daño y cadencia', '+1 bala', 'Más daño y cadencia', '+1 bala'],
+    },
+    revolver: {
+      name: 'Revólver', icon: '🤠', desc: 'Balas pesadas que atraviesan a un enemigo.',
+      up: ['Más daño y cadencia', 'Más daño y cadencia', '+1 bala', 'Más daño y cadencia'],
+    },
+    escopeta: {
+      name: 'Escopeta', icon: '💥', desc: 'Ráfaga de perdigones a corta distancia que empuja a los enemigos.',
+      up: ['Más daño y cadencia', '+1 perdigón', 'Más daño y cadencia', '+1 perdigón'],
+    },
+    subfusil: {
+      name: 'Subfusil', icon: '🎇', desc: 'Lluvia de balas rápidas con algo de dispersión.',
+      up: ['Más daño y cadencia', 'Más daño y cadencia', 'Más daño y cadencia', 'Más daño y cadencia'],
+    },
+    francotirador: {
+      name: 'Francotirador', icon: '🔭', desc: 'Disparo lento y devastador que atraviesa a todos. Apunta a los más duros.',
+      up: ['Más daño y cadencia', 'Más daño y cadencia', 'Más daño y cadencia', 'Más daño y cadencia'],
+    },
+    katana: {
+      name: 'Katana', icon: '🗡️', desc: 'Tajo en arco a los enemigos cercanos.',
+      up: ['Más daño y rapidez', 'Más alcance', 'Más daño y rapidez', 'Más alcance'],
+    },
+    lanzacohetes: {
+      name: 'Lanzacohetes', icon: '🚀', desc: 'Cohetes que explotan y dañan en área.',
+      up: ['Más daño y cadencia', 'Explosión más grande', '+1 cohete', 'Más daño y explosión más grande'],
+    },
+  },
+
   PASSIVES: {
     poder:   { name: 'Gema de Poder',   icon: '💎', desc: '+10% de daño.',                      max: 5, apply: p => { p.stats.dmg += 0.10; } },
     reloj:   { name: 'Reloj de Arena',  icon: '⏳', desc: '-8% tiempo de recarga.',             max: 5, apply: p => { p.stats.cd *= 0.92; } },
@@ -51,55 +84,42 @@ window.HN_DATA = {
     { at: 600, name: 'Rey del Abismo',      hp: 20000, r: 48, speed: 60, dmg: 35, color: '#ff3d7f', shots: 18, final: true },
   ],
 
+  // Los personajes solo cambian estadísticas: el ataque principal lo da el arma equipada.
   CHARS: [
     {
-      id: 'aria', name: 'Aria', title: 'Hechicera', weapon: 'chispa', cost: 0,
-      desc: 'Equilibrada. Ideal para empezar.', mods: {},
-      body: '#4de1ff', hood: '#5a46d6', cloak: '#3b2b8f', acc: 'hood',
+      id: 'marc', name: 'Marc', title: 'del Barco', cost: 0,
+      desc: 'El personaje inicial: ni suma ni resta nada.', mods: {},
+      body: '#f0c8a0', hood: '#f4f6fb', cloak: '#1f3f7a', acc: 'sailor',
     },
     {
-      id: 'bruno', name: 'Bruno', title: 'Guardián', weapon: 'orbe', cost: 250,
-      desc: '+40 vida, +1 armadura, -10% velocidad.', mods: { hp: 40, armor: 1, speed: -0.10 },
-      body: '#ffb84d', hood: '#8d96a8', cloak: '#5a2e12', acc: 'helm',
-    },
-    {
-      id: 'kira', name: 'Kira', title: 'Exploradora', weapon: 'disco', cost: 400,
-      desc: '+15% velocidad, +25% radio de recogida.', mods: { speed: 0.15, magnet: 0.25 },
-      body: '#7dff9a', hood: '#ff4d6a', cloak: '#124a2e', acc: 'band',
-    },
-    {
-      id: 'vulcan', name: 'Vulcan', title: 'Piromante', weapon: 'halo', cost: 600,
-      desc: '+15% daño, +10% área, -20 vida.', mods: { dmg: 0.15, area: 0.10, hp: -20 },
-      body: '#ff7b4d', hood: '#7a1f2e', cloak: '#4a1220', acc: 'flame',
-    },
-    {
-      id: 'nova', name: 'Nova', title: 'Tormenta', weapon: 'rayo', cost: 900,
-      desc: '-12% recarga, +1 vida/s.', mods: { cd: 0.88, regen: 1 },
-      body: '#f4f0ff', hood: '#2d6bff', cloak: '#1a2a6b', acc: 'spark',
-    },
-    {
-      id: 'salim', name: 'Salim', title: 'el Inútil', weapon: 'chispa', cost: 100,
+      id: 'salim', name: 'Salim', title: 'el Inútil', cost: 100,
       desc: '-25% daño, -10% velocidad. La suerte del inútil: +40% oro y +25% experiencia.',
       mods: { dmg: -0.25, speed: -0.10, gold: 0.40, xp: 0.25 },
       body: '#d9b48a', hood: '#9aa3ad', cloak: '#5b4a3a', acc: 'bucket',
     },
     {
-      id: 'ivan', name: 'Iván', title: 'el Tanque', weapon: 'halo', cost: 700,
-      desc: '+80 vida, +2 armadura, +1 vida/s. Lento (-20%) y grande: le dan más fácil.',
-      mods: { hp: 80, armor: 2, regen: 1, speed: -0.20, size: 1.3 },
-      body: '#e0a46b', hood: '#7b8794', cloak: '#3a2a1a', acc: 'viking', wide: 1.15,
+      id: 'alex', name: 'Alex', title: 'el Guapo', cost: 350,
+      desc: 'Tan guapo que todo va hacia él: +40% recogida y +15% experiencia. Además, +10% daño y +5% velocidad.',
+      mods: { magnet: 0.40, xp: 0.15, dmg: 0.10, speed: 0.05 },
+      body: '#f1c27d', hood: '#3b2a20', cloak: '#1f3a93', acc: 'cool',
     },
     {
-      id: 'pol', name: 'Pol', title: 'el Flaco', weapon: 'chispa', cost: 500,
+      id: 'pol', name: 'Pol', title: 'el Flaco', cost: 500,
       desc: '+30% velocidad, -10% recarga y difícil de alcanzar, pero solo 60 de vida.',
       mods: { hp: -40, speed: 0.30, cd: 0.90, size: 0.75 },
       body: '#ffe0b8', hood: '#2bd4a0', cloak: '#1d5c4a', acc: 'cap', wide: 0.7,
     },
     {
-      id: 'igor', name: 'Igor', title: 'el Alto', weapon: 'rayo', cost: 550,
+      id: 'igor', name: 'Igor', title: 'el Alto', cost: 550,
       desc: 'Llega a todo: +20% área, +40% recogida, +5% velocidad y +20 vida. Torpe (-10% daño) y es un blanco grande.',
       mods: { area: 0.20, magnet: 0.40, speed: 0.05, hp: 20, dmg: -0.10, size: 1.15 },
       body: '#c8e6c9', hood: '#2b2d42', cloak: '#4a3f6b', acc: 'tophat', wide: 0.75, tall: 1.45,
+    },
+    {
+      id: 'ivan', name: 'Iván', title: 'el Tanque', cost: 700,
+      desc: '+80 vida, +2 armadura, +1 vida/s. Lento (-20%) y grande: le dan más fácil.',
+      mods: { hp: 80, armor: 2, regen: 1, speed: -0.20, size: 1.3 },
+      body: '#e0a46b', hood: '#7b8794', cloak: '#3a2a1a', acc: 'viking', wide: 1.15,
     },
   ],
 
@@ -141,13 +161,13 @@ window.HN_DATA = {
     { id: 'amuleto', name: 'Amuleto', icon: '📿' },
   ],
   ITEMS: [
-    // Armas principales
-    { id: 'varita',       slot: 'arma', rarity: 'comun',      icon: '🪄', name: 'Varita Arcana',       weapon: 'chispa', stats: { dmg: 0.05 } },
-    { id: 'cuchillas',    slot: 'arma', rarity: 'raro',       icon: '🌀', name: 'Cuchillas Gemelas',   weapon: 'orbe',   stats: { hp: 10 } },
-    { id: 'disco_bronce', slot: 'arma', rarity: 'raro',       icon: '🥏', name: 'Disco de Bronce',     weapon: 'disco',  stats: { speed: 0.05 } },
-    { id: 'brasero',      slot: 'arma', rarity: 'raro',       icon: '🏮', name: 'Brasero de Mano',     weapon: 'halo',   stats: { area: 0.05 } },
-    { id: 'cetro',        slot: 'arma', rarity: 'epico',      icon: '🔱', name: 'Cetro de Tormenta',   weapon: 'rayo',   stats: { cd: 0.05, dmg: 0.05 } },
-    { id: 'filo_eclipse', slot: 'arma', rarity: 'legendario', icon: '🗡️', name: 'Filo del Eclipse',    weapon: 'chispa', stats: { dmg: 0.12, cd: 0.06 } },
+    // Armas principales (sustituyen al ataque básico)
+    { id: 'revolver',      slot: 'arma', rarity: 'comun',      icon: '🤠', name: 'Revólver',      weapon: 'revolver',      stats: { dmg: 0.03 } },
+    { id: 'escopeta',      slot: 'arma', rarity: 'raro',       icon: '💥', name: 'Escopeta',      weapon: 'escopeta',      stats: { hp: 10 } },
+    { id: 'subfusil',      slot: 'arma', rarity: 'raro',       icon: '🎇', name: 'Subfusil',      weapon: 'subfusil',      stats: { speed: 0.03 } },
+    { id: 'katana',        slot: 'arma', rarity: 'epico',      icon: '🗡️', name: 'Katana',        weapon: 'katana',        stats: { speed: 0.05 } },
+    { id: 'francotirador', slot: 'arma', rarity: 'epico',      icon: '🔭', name: 'Francotirador', weapon: 'francotirador', stats: { xp: 0.05 } },
+    { id: 'lanzacohetes',  slot: 'arma', rarity: 'legendario', icon: '🚀', name: 'Lanzacohetes',  weapon: 'lanzacohetes',  stats: { dmg: 0.05 } },
     // Cascos
     { id: 'capucha',  slot: 'casco', rarity: 'comun',      icon: '🧢', name: 'Capucha de Viaje', stats: { hp: 10 } },
     { id: 'yelmo',    slot: 'casco', rarity: 'raro',       icon: '⛑️', name: 'Yelmo de Hierro',  stats: { armor: 1, hp: 5 } },

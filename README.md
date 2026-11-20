@@ -40,9 +40,25 @@ Funciona igual que el cooperativo local (nivel y oro compartidos, mejoras por tu
 
 Cómo funciona por dentro: los dos navegadores se conectan directamente con **WebRTC**. Firebase solo se usa para intercambiar el código de la sala, y esa sala se borra al conectar. El anfitrión simula la partida y envía el estado unas 15 veces por segundo (hasta ~110 KB/s con la pantalla llena). El invitado mueve a su personaje en su propia pantalla, así no nota el retraso. Algunas redes muy restrictivas (por ejemplo, ciertas redes de empresa o universidad) no permiten la conexión directa; en ese caso, prueba con datos móviles.
 
-### Armas
+### Ataque principal (armas)
 
-| Arma | Efecto | Objeto clave | Evolución |
+Todos empiezan con la **🔫 Pistola** (ataque básico). El arma que te equipes (conseguida en los cofres) pasa a ser el **ataque principal de cualquier personaje**. Sube de nivel durante la partida (+25% de daño por nivel) y, si el objeto está mejorado, hace un 15% más de daño por cada nivel del objeto.
+
+| Arma | Rareza | Cómo ataca | Daño/s a una horda cercana (Nv1) |
+|---|---|---|---|
+| 🔫 Pistola | Básica | Dispara al enemigo más cercano | 15 |
+| 🤠 Revólver | Común | Balas pesadas que atraviesan a un enemigo | 23 |
+| 🎇 Subfusil | Raro | Lluvia de balas rápidas con dispersión | 30 |
+| 💥 Escopeta | Raro | Perdigones a corta distancia que empujan | 38 |
+| 🔭 Francotirador | Épico | Disparo lento que atraviesa a todos y apunta a los más duros | 71 |
+| 🗡️ Katana | Épico | Tajo en arco a los enemigos cercanos | 72 |
+| 🚀 Lanzacohetes | Legendario | Cohetes que explotan en área | 125 |
+
+### Habilidades (al subir de nivel)
+
+Durante la partida, al subir de nivel puedes conseguir habilidades que se suman al ataque principal, y que evolucionan con su objeto clave:
+
+| Habilidad | Efecto | Objeto clave | Evolución |
 |---|---|---|---|
 | ✨ Chispa Arcana | Dispara al enemigo más cercano | 📘 Tomo Duplicador | Tormenta Arcana |
 | 🌀 Cuchillas Orbitales | Cuchillas giran a tu alrededor | 🔍 Lente Prisma | Anillo Eterno |
@@ -50,9 +66,10 @@ Cómo funciona por dentro: los dos navegadores se conectan directamente con **We
 | ⚡ Rayo Celeste | Rayos sobre enemigos al azar | ⏳ Reloj de Arena | Juicio Tronante |
 | 🥏 Disco Retornante | Disco de ida y vuelta que atraviesa | 💎 Gema de Poder | Eclipse Giratorio |
 
+
 Objetos pasivos extra: 👢 Botas Veloces (velocidad) e 🧲 Imán Lunar (radio de recogida).
 
-### Equilibrio de daño
+### Equilibrio de daño de las habilidades
 
 Daño por segundo aproximado a cada enemigo, sin bonificaciones. Las armas de área y cuerpo a cuerpo hacen menos por enemigo porque golpean a muchos a la vez.
 
@@ -68,25 +85,22 @@ Los enemigos ganan vida cada vez más rápido (×4 a los 5 minutos y ×10 a los 
 
 ### Personajes
 
-Se desbloquean con oro en la pantalla de selección.
+Los personajes **solo cambian estadísticas**: el ataque principal lo da el arma equipada. Se desbloquean con oro en la pantalla de selección.
 
-| Personaje | Arma inicial | Bonus | Precio |
-|---|---|---|---|
-| Aria, Hechicera | ✨ Chispa Arcana | Equilibrada | Gratis |
-| Bruno, Guardián | 🌀 Cuchillas Orbitales | +40 vida, +1 armadura, -10% velocidad | 🪙 250 |
-| Kira, Exploradora | 🥏 Disco Retornante | +15% velocidad, +25% recogida | 🪙 400 |
-| Vulcan, Piromante | 🔥 Halo Ardiente | +15% daño, +10% área, -20 vida | 🪙 600 |
-| Nova, Tormenta | ⚡ Rayo Celeste | -12% recarga, +1 vida/s | 🪙 900 |
-| Salim, el Inútil | ✨ Chispa Arcana | -25% daño, -10% velocidad; +40% oro y +25% experiencia | 🪙 100 |
-| Iván, el Tanque | 🔥 Halo Ardiente | +80 vida, +2 armadura, +1 vida/s; -20% velocidad y más grande | 🪙 700 |
-| Pol, el Flaco | ✨ Chispa Arcana | +30% velocidad, -10% recarga, más pequeño; solo 60 de vida | 🪙 500 |
-| Igor, el Alto | ⚡ Rayo Celeste | +20% área, +40% recogida, +5% velocidad, +20 vida; -10% daño y blanco grande | 🪙 550 |
+| Personaje | Bonificaciones | Precio |
+|---|---|---|
+| ⚓ Marc, del Barco | Personaje inicial: ni suma ni resta nada | Gratis |
+| 🪣 Salim, el Inútil | -25% daño, -10% velocidad; +40% oro y +25% experiencia | 🪙 100 |
+| 😎 Alex, el Guapo | +40% recogida, +15% experiencia, +10% daño, +5% velocidad | 🪙 350 |
+| 🧢 Pol, el Flaco | +30% velocidad, -10% recarga, más pequeño; solo 60 de vida | 🪙 500 |
+| 🎩 Igor, el Alto | +20% área, +40% recogida, +5% velocidad, +20 vida; -10% daño y blanco grande | 🪙 550 |
+| 🪖 Iván, el Tanque | +80 vida, +2 armadura, +1 vida/s; -20% velocidad y más grande | 🪙 700 |
 
 ### Equipo y cofres
 
 En **🎒 Equipo** tienes 5 huecos: **arma**, **casco**, **pecho**, **botas** y **amuleto**.
 
-- **El arma equipada sustituye al ataque básico** del personaje (por ejemplo, Aria con el *Cetro de Tormenta* empieza con Rayo Celeste) y además da una bonificación.
+- **El arma equipada es el ataque principal** de cualquier personaje (ver tabla de armas) y además da una pequeña bonificación.
 - Los objetos tienen rareza (**común**, **raro**, **épico** y **legendario**) y se **mejoran con oro** hasta nivel 5. Cada nivel añade un 50% de la bonificación base.
 - **No se compran directamente**: salen en **🎰 cofres con ruleta**, que se compran con oro, o como **🎁 botín** (cada jefe derrotado tiene un 50% de soltar un objeto; los legendarios solo si ganas la partida). Si te toca uno que ya tienes, sube de nivel, y si ya estaba al máximo recibes oro.
 
@@ -99,7 +113,7 @@ En **🎒 Equipo** tienes 5 huecos: **arma**, **casco**, **pecho**, **botas** y 
 
 | Hueco | Objetos |
 |---|---|
-| ⚔️ Arma | Varita Arcana, Cuchillas Gemelas, Disco de Bronce, Brasero de Mano, Cetro de Tormenta, Filo del Eclipse |
+| ⚔️ Arma | Revólver, Escopeta, Subfusil, Katana, Francotirador, Lanzacohetes |
 | 🪖 Casco | Capucha de Viaje, Yelmo de Hierro, Corona del Sabio |
 | 🦺 Pecho | Túnica Reforzada, Cota de Malla, Manto Estelar |
 | 🥾 Botas | Sandalias Ligeras, Botas del Viento, Botas de Fase |

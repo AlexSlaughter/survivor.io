@@ -4,7 +4,9 @@
  * HTML5 Canvas + JavaScript puro, sin dependencias.
  */
 (() => {
-  const { WEAPONS, PASSIVES, ETYPES, BOSSES, CHARS, MAPS, SHOP, RARITY, EQUIP_SLOTS, ITEMS, STAT_LABELS, ITEM_MAX, CHESTS } = window.HN_DATA;
+  const { WEAPONS, MAIN_WEAPONS, PASSIVES, ETYPES, BOSSES, CHARS, MAPS, SHOP, RARITY, EQUIP_SLOTS, ITEMS, STAT_LABELS, ITEM_MAX, CHESTS } = window.HN_DATA;
+  // Las armas principales se tratan como armas (suben de nivel en partida), pero no salen como armas nuevas ni evolucionan.
+  for (const k in MAIN_WEAPONS) WEAPONS[k] = Object.assign({ main: true }, MAIN_WEAPONS[k]);
   const itemById = id => ITEMS.find(it => it.id === id);
   const TAU = Math.PI * 2;
   const canvas = document.getElementById('game');
@@ -53,7 +55,7 @@
 
   // ---------- Guardado ----------
   const SAVE_KEY = 'hn_save_v1';
-  const defaultSave = () => ({ gold: 0, up: {}, chars: ['aria'], char: 'aria', map: 'bosque', best: {}, wins: {}, sfx: true, music: true, t: 0, mode: 'solo', char2: 'aria', items: {}, equip: {} });
+  const defaultSave = () => ({ gold: 0, up: {}, chars: ['marc'], char: 'marc', map: 'bosque', best: {}, wins: {}, sfx: true, music: true, t: 0, mode: 'solo', char2: 'marc', items: {}, equip: {} });
   function loadSave() {
     let s = null;
     try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* sin almacenamiento */ }
@@ -83,7 +85,7 @@
       if (l > 0) d.up[it.id] = Math.min(it.max, l);
     }
     const chars = Array.isArray(o.chars) ? o.chars : [];
-    for (const c of CHARS) if (c.id !== 'aria' && chars.includes(c.id)) d.chars.push(c.id);
+    for (const c of CHARS) if (c.id !== 'marc' && chars.includes(c.id)) d.chars.push(c.id);
     for (const m of MAPS) {
       const b = +(o.best && o.best[m.id]) || 0, w = Math.floor(+(o.wins && o.wins[m.id]) || 0);
       if (b > 0) d.best[m.id] = b;
@@ -133,8 +135,8 @@
     m.items = {};
     for (const it of ITEMS) { const l = Math.max(a.items[it.id] || 0, b.items[it.id] || 0); if (l) m.items[it.id] = l; }
     m.equip = sanitizeGear(m.items, Object.keys(a.equip).length ? a.equip : b.equip).equip;
-    if (!m.chars.includes(m.char)) m.char = 'aria';
-    if (!m.chars.includes(m.char2)) m.char2 = 'aria';
+    if (!m.chars.includes(m.char)) m.char = 'marc';
+    if (!m.chars.includes(m.char2)) m.char2 = 'marc';
     return m;
   }
   function replaceSave(m) { for (const k of Object.keys(S)) delete S[k]; Object.assign(S, m); }
@@ -190,16 +192,16 @@
   const itemValue = (v, lvl) => v * (1 + 0.5 * (lvl - 1));
   function gearStats(gear) {
     const st = {};
-    let weapon = null;
-    if (!gear) return { st, weapon };
+    let weapon = null, weaponLvl = 1;
+    if (!gear) return { st, weapon, weaponLvl };
     for (const sl of EQUIP_SLOTS) {
       const it = itemById(gear.equip[sl.id]);
       if (!it) continue;
       const lvl = gear.items[it.id] || 1;
       for (const k in it.stats) st[k] = (st[k] || 0) + itemValue(it.stats[k], lvl);
-      if (it.weapon) weapon = it.weapon;
+      if (it.weapon) { weapon = it.weapon; weaponLvl = lvl; }
     }
-    return { st, weapon };
+    return { st, weapon, weaponLvl };
   }
   const myGear = () => ({ items: S.items, equip: S.equip });
 
@@ -232,7 +234,9 @@
     p.maxHp += q.hp || 0; s.armor += q.armor || 0; s.speed += q.speed || 0; s.dmg += q.dmg || 0;
     s.cd *= 1 - (q.cd || 0); s.area += q.area || 0; s.magnet += q.magnet || 0; s.xp += q.xp || 0;
     s.gold += q.gold || 0; s.regen += q.regen || 0;
-    p.startWeapon = g.weapon || ch.weapon;
+    // El ataque principal lo da el arma equipada; sin arma, la pistola básica.
+    p.startWeapon = g.weapon || 'basico';
+    p.startWeaponLvl = g.weapon ? g.weaponLvl : 1;
     p.maxHp = Math.max(1, Math.round(p.maxHp));
     p.hp = p.maxHp;
     return p;
@@ -258,7 +262,7 @@
       leash: null, eid: 0, netEvents: [], netT: 0,
       enemies: [], bullets: [], ebullets: [], gems: [], pickups: [], particles: [], texts: [], effects: [],
     };
-    for (const p of players) addWeapon(p, p.startWeapon);
+    for (const p of players) addWeapon(p, p.startWeapon, p.startWeaponLvl);
   }
 
   const alive = () => G.players.filter(p => !p.down);
@@ -272,7 +276,7 @@
     return best;
   }
   const hasWeapon = (p, id) => p.weapons.find(w => w.id === id);
-  const addWeapon = (p, id) => p.weapons.push({ id, lvl: 1, t: 0.3, evolved: false, angle: 0 });
+  const addWeapon = (p, id, ilvl = 1) => p.weapons.push({ id, lvl: 1, t: 0.3, evolved: false, angle: 0, ilvl });
   function addPassive(p, id) { p.passives[id] = (p.passives[id] || 0) + 1; PASSIVES[id].apply(p); }
   const canEvolve = (p, w) => !w.evolved && w.lvl >= WMAX && !!p.passives[WEAPONS[w.id].evo];
   function heal(p, n) { p.hp = Math.min(p.maxHp, p.hp + n); addText(p.x, p.y - 24, '+' + n, '#6fffb0'); }
@@ -535,6 +539,128 @@
   }
 
   // ---------- Armas ----------
+  // ---------- Armas principales ----------
+  // Daño: +25% por nivel en partida y +15% por cada nivel del objeto equipado.
+  const mainMul = w => (1 + 0.25 * (w.lvl - 1)) * (1 + 0.15 * ((w.ilvl || 1) - 1));
+  const aimAt = (p, t) => t ? Math.atan2(t.y - p.y, t.x - p.x) : Math.atan2(p.face.y, p.face.x);
+  const spreadA = (i, n, step) => (i - (n - 1) / 2) * step;
+  function shootBala(p, a, o) {
+    G.bullets.push({
+      kind: 'bala', x: p.x, y: p.y, vx: Math.cos(a) * o.spd, vy: Math.sin(a) * o.spd, r: o.r || 4,
+      dmg: o.dmg, life: o.life, pierce: o.pierce || 0, hit: new Set(), color: o.color, kb: o.kb ?? 100,
+    });
+  }
+  function explode(b) {
+    query(b.x, b.y, b.R, e => {
+      const kx = e.x - b.x, ky = e.y - b.y, l = Math.hypot(kx, ky) || 1;
+      hurt(e, b.dmg, kx / l, ky / l, 160);
+    });
+    G.effects.push({ type: 'boom', x: b.x, y: b.y, R: b.R, life: 0.35, max: 0.35 });
+    netOut(['x', Math.round(b.x), Math.round(b.y), Math.round(b.R)]);
+    G.shake = Math.max(G.shake, 3);
+    sfx('boom', 0.05);
+  }
+
+  const MAIN_UPDATE = {
+    basico(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      const t = nearest(p.x, p.y, 1, 480)[0];
+      if (!t) { w.t = 0.15; return; }
+      w.t = (0.95 - 0.05 * (w.lvl - 1)) * s.cd;
+      const n = 1 + (w.lvl >= 3 ? 1 : 0) + (w.lvl >= 5 ? 1 : 0) + s.proj, a = aimAt(p, t);
+      for (let i = 0; i < n; i++) shootBala(p, a + spreadA(i, n, 0.12), { spd: 520, dmg: 12 * mainMul(w) * s.dmg, life: 1.0, color: '#ffe9a8' });
+      sfx('pew', 0.08);
+    },
+    revolver(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      const t = nearest(p.x, p.y, 1, 520)[0];
+      if (!t) { w.t = 0.15; return; }
+      w.t = (0.85 - 0.05 * (w.lvl - 1)) * s.cd;
+      const n = 1 + (w.lvl >= 4 ? 1 : 0) + s.proj, a = aimAt(p, t);
+      for (let i = 0; i < n; i++) shootBala(p, a + spreadA(i, n, 0.1), { spd: 620, r: 5, dmg: 18 * mainMul(w) * s.dmg, life: 1.0, pierce: 1, color: '#ffcf7a', kb: 160 });
+      sfx('pew', 0.08);
+    },
+    escopeta(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      const t = nearest(p.x, p.y, 1, 280)[0];
+      if (!t) { w.t = 0.12; return; }
+      w.t = (1.15 - 0.05 * (w.lvl - 1)) * s.cd;
+      const n = 5 + (w.lvl >= 3 ? 1 : 0) + (w.lvl >= 5 ? 1 : 0) + s.proj * 2, a = aimAt(p, t);
+      for (let i = 0; i < n; i++) {
+        shootBala(p, a + spreadA(i, n, 0.6 / (n - 1)) + rand(-0.04, 0.04),
+          { spd: 650 * rand(0.9, 1.1), r: 3.5, dmg: 9 * mainMul(w) * s.dmg, life: 0.34, color: '#ffd27a', kb: 260 });
+      }
+      G.shake = Math.max(G.shake, 2);
+      sfx('shotgun', 0.1);
+    },
+    subfusil(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      const t = nearest(p.x, p.y, 1, 430)[0];
+      if (!t) { w.t = 0.1; return; }
+      w.t = (0.13 - 0.008 * (w.lvl - 1)) * s.cd;
+      const n = 1 + s.proj, a = aimAt(p, t);
+      for (let i = 0; i < n; i++) shootBala(p, a + spreadA(i, n, 0.15) + rand(-0.14, 0.14), { spd: 650, r: 3, dmg: 4 * mainMul(w) * s.dmg, life: 0.7, color: '#bfe9ff', kb: 40 });
+      sfx('smg', 0.07);
+    },
+    francotirador(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      // Apunta primero a los enemigos más resistentes (élites y jefes).
+      const cand = [];
+      for (const e of G.enemies) if (!e.dead && dist2(p.x, p.y, e.x, e.y) < 780 * 780) cand.push(e);
+      if (!cand.length) { w.t = 0.15; return; }
+      cand.sort((a, b) => b.maxHp - a.maxHp || dist2(p.x, p.y, a.x, a.y) - dist2(p.x, p.y, b.x, b.y));
+      w.t = (1.9 - 0.1 * (w.lvl - 1)) * s.cd;
+      const n = 1 + s.proj;
+      for (let i = 0; i < n; i++) {
+        const t = cand[i % cand.length];
+        shootBala(p, aimAt(p, t), { spd: 1400, r: 5, dmg: 95 * mainMul(w) * s.dmg, life: 0.65, pierce: 99, color: '#9dffef', kb: 220 });
+      }
+      G.shake = Math.max(G.shake, 3);
+      sfx('sniper', 0.1);
+    },
+    katana(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      const R = (95 + (w.lvl >= 3 ? 15 : 0) + (w.lvl >= 5 ? 15 : 0)) * s.area;
+      const t = nearest(p.x, p.y, 1, R + 20)[0];
+      if (!t) { w.t = 0.1; return; }
+      w.t = (0.75 - 0.04 * (w.lvl - 1)) * s.cd;
+      const arcs = 1 + s.proj, arc = 2.2, dmg = 18 * mainMul(w) * s.dmg, base = aimAt(p, t);
+      for (let k = 0; k < arcs; k++) {
+        const a = base + k * TAU / arcs;
+        query(p.x, p.y, R, e => {
+          let da = Math.atan2(e.y - p.y, e.x - p.x) - a;
+          da = Math.atan2(Math.sin(da), Math.cos(da));
+          if (Math.abs(da) > arc / 2) return;
+          const kx = e.x - p.x, ky = e.y - p.y, l = Math.hypot(kx, ky) || 1;
+          hurt(e, dmg, kx / l, ky / l, 220);
+        });
+        G.effects.push({ type: 'slash', x: p.x, y: p.y, a, R, arc, life: 0.22, max: 0.22 });
+        netOut(['k', Math.round(p.x), Math.round(p.y), r1(a), Math.round(R), arc]);
+      }
+      sfx('slash', 0.1);
+    },
+    lanzacohetes(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      const n = 1 + (w.lvl >= 4 ? 1 : 0) + s.proj;
+      const targets = nearest(p.x, p.y, n, 650);
+      if (!targets.length) { w.t = 0.2; return; }
+      w.t = (2.1 - 0.1 * (w.lvl - 1)) * s.cd;
+      const R = 70 * s.area * (1 + (w.lvl >= 3 ? 0.2 : 0) + (w.lvl >= 5 ? 0.2 : 0));
+      for (let i = 0; i < n; i++) {
+        const a = aimAt(p, targets[i % targets.length]) + (i >= targets.length ? rand(-0.3, 0.3) : 0);
+        G.bullets.push({ kind: 'cohete', x: p.x, y: p.y, vx: Math.cos(a) * 380, vy: Math.sin(a) * 380, r: 6, dmg: 34 * mainMul(w) * s.dmg, R, life: 2.2 });
+      }
+      sfx('launch', 0.1);
+    },
+  };
+
   const W_UPDATE = {
     chispa(w, dt, p, s) {
       w.t -= dt;
@@ -626,11 +752,13 @@
     },
   };
 
+  Object.assign(W_UPDATE, MAIN_UPDATE);
+
   // ---------- Subida de nivel ----------
   function buildOptions(p, count) {
     const o = [];
     for (const w of p.weapons) if (!w.evolved && w.lvl < WMAX) o.push({ k: 'w', id: w.id });
-    if (p.weapons.length < SLOTS) for (const id in WEAPONS) if (!hasWeapon(p, id)) o.push({ k: 'nw', id });
+    if (p.weapons.length < SLOTS) for (const id in WEAPONS) if (!WEAPONS[id].main && !hasWeapon(p, id)) o.push({ k: 'nw', id });
     const owned = Object.keys(p.passives);
     for (const id of owned) if (p.passives[id] < PASSIVES[id].max) o.push({ k: 'p', id });
     if (owned.length < SLOTS) for (const id in PASSIVES) if (!p.passives[id]) o.push({ k: 'np', id });
@@ -642,11 +770,11 @@
   function describe(p, o) {
     if (o.k === 'heal') return { icon: '🍖', title: 'Festín', lvl: '', isNew: false, desc: 'Recupera 40 de vida.', hint: '' };
     if (o.k === 'w' || o.k === 'nw') {
-      const d = WEAPONS[o.id], w = hasWeapon(p, o.id), nl = w ? w.lvl + 1 : 1, ps = PASSIVES[d.evo];
+      const d = WEAPONS[o.id], w = hasWeapon(p, o.id), nl = w ? w.lvl + 1 : 1, ps = d.evo && PASSIVES[d.evo];
       return {
         icon: d.icon, title: d.name, lvl: w ? `Nv. ${nl}` : '¡Nuevo!', isNew: !w,
         desc: w ? d.up[nl - 2] : d.desc,
-        hint: nl === WMAX ? `Evoluciona con ${ps.icon} ${ps.name}` : '',
+        hint: nl === WMAX && ps ? `Evoluciona con ${ps.icon} ${ps.name}` : d.main ? 'Ataque principal' : '',
       };
     }
     const d = PASSIVES[o.id], l = p.passives[o.id] || 0;
@@ -947,8 +1075,20 @@
   function updateBullets(dt) {
     for (const b of G.bullets) {
       b.life -= dt;
-      if (b.life <= 0) { b.dead = true; continue; }
-      if (b.kind === 'chispa') {
+      if (b.life <= 0) { if (b.kind === 'cohete') explode(b); b.dead = true; continue; }
+      if (b.kind === 'bala') {
+        b.x += b.vx * dt; b.y += b.vy * dt;
+        query(b.x, b.y, b.r, e => {
+          if (b.dead || b.hit.has(e)) return;
+          b.hit.add(e);
+          const l = Math.hypot(b.vx, b.vy) || 1;
+          hurt(e, b.dmg, b.vx / l, b.vy / l, b.kb);
+          if (--b.pierce < 0) b.dead = true;
+        });
+      } else if (b.kind === 'cohete') {
+        b.x += b.vx * dt; b.y += b.vy * dt;
+        query(b.x, b.y, b.r, () => { if (!b.dead) { b.dead = true; explode(b); } });
+      } else if (b.kind === 'chispa') {
         b.x += b.vx * dt; b.y += b.vy * dt;
         query(b.x, b.y, b.r, e => {
           if (b.dead || b.hit.has(e)) return;
@@ -1287,6 +1427,26 @@
         ctx.fillRect(x - w * 0.8, cy - r * 1.15, w * 1.6, r * 0.22);
         break;
       }
+      case 'sailor': {
+        // Gorro de marinero blanco con cinta azul.
+        const w = r * (ch.wide || 1);
+        ctx.beginPath(); ctx.ellipse(x, cy - r * 0.62, w * 0.95, r * 0.5, 0, Math.PI, 0); ctx.fill();
+        ctx.fillRect(x - w * 1.05, cy - r * 0.68, w * 2.1, r * 0.22);
+        ctx.fillStyle = '#1f3f7a';
+        ctx.fillRect(x - w * 0.95, cy - r * 0.8, w * 1.9, r * 0.14);
+        break;
+      }
+      case 'cool': {
+        // Tupé.
+        const sd = face.side || (face.x >= 0 ? 1 : -1), w = r * (ch.wide || 1);
+        ctx.beginPath(); ctx.ellipse(x, cy - r * 0.35, w + 0.5, r * 0.72, 0, Math.PI, 0); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(x - sd * w * 0.6, cy - r * 0.9);
+        ctx.quadraticCurveTo(x + sd * w * 0.2, cy - r * 1.75, x + sd * w * 1.15, cy - r * 1.05);
+        ctx.quadraticCurveTo(x + sd * w * 0.4, cy - r * 1.05, x + sd * w * 0.1, cy - r * 0.6);
+        ctx.fill();
+        break;
+      }
       case 'cap': {
         // Gorra con visera hacia donde mira.
         const sd = face.side || (face.x >= 0 ? 1 : -1), w = r * (ch.wide || 1);
@@ -1296,6 +1456,16 @@
       }
     }
     eyes(x + face.x * r * 0.35, cy + 1 + face.y * 3, r * 0.25);
+    if (ch.acc === 'cool') {
+      // Gafas de sol encima de los ojos.
+      const ex = x + face.x * r * 0.35, ey = cy + 1 + face.y * 3, e = r * 0.25;
+      ctx.fillStyle = '#111';
+      ctx.beginPath(); ctx.ellipse(ex - e, ey, e * 1.15, e * 0.85, 0, 0, TAU); ctx.ellipse(ex + e, ey, e * 1.15, e * 0.85, 0, 0, TAU); ctx.fill();
+      ctx.fillRect(ex - e * 0.3, ey - e * 0.35, e * 0.6, e * 0.3);
+      ctx.fillStyle = 'rgba(255,255,255,.6)';
+      ctx.fillRect(ex - e * 1.4, ey - e * 0.45, e * 0.45, e * 0.2);
+      ctx.fillRect(ex + e * 0.6, ey - e * 0.45, e * 0.45, e * 0.2);
+    }
   }
 
   function drawPlayers() {
@@ -1375,7 +1545,23 @@
   function drawBullets() {
     for (const b of G.bullets) {
       if (!inView(b.x, b.y, 40)) continue;
-      if (b.kind === 'chispa') {
+      if (b.kind === 'bala') {
+        // Trazadora: estela del color del arma y punta blanca.
+        ctx.strokeStyle = b.color; ctx.lineWidth = b.r; ctx.lineCap = 'round'; ctx.globalAlpha = 0.75;
+        ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx * 0.025, b.y - b.vy * 0.025); ctx.stroke();
+        ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 0.6, 0, TAU); ctx.fill();
+      } else if (b.kind === 'cohete') {
+        ctx.save();
+        ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx));
+        ctx.fillStyle = '#ffb02e';
+        ctx.beginPath(); ctx.moveTo(-8, -3); ctx.lineTo(-15 - Math.random() * 6, 0); ctx.lineTo(-8, 3); ctx.fill();
+        ctx.fillStyle = '#d9dde8'; rr(-8, -4, 14, 8, 3); ctx.fill();
+        ctx.fillStyle = '#e74c3c';
+        ctx.beginPath(); ctx.moveTo(6, -4); ctx.lineTo(11, 0); ctx.lineTo(6, 4); ctx.fill();
+        ctx.restore();
+      } else if (b.kind === 'chispa') {
         const col = b.ev ? '#9dffef' : '#ffe066';
         ctx.strokeStyle = col; ctx.globalAlpha = 0.4; ctx.lineWidth = b.r;
         ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx * 0.03, b.y - b.vy * 0.03); ctx.stroke();
@@ -1407,6 +1593,26 @@
 
   function drawEffects() {
     for (const f of G.effects) {
+      if (f.type === 'slash') {
+        const k = f.life / f.max;
+        ctx.globalAlpha = k;
+        ctx.strokeStyle = '#eef6ff'; ctx.lineWidth = 3 + 7 * k; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.arc(f.x, f.y, f.R * (0.75 + 0.25 * (1 - k)), f.a - f.arc / 2, f.a + f.arc / 2); ctx.stroke();
+        ctx.strokeStyle = '#9dd6ff'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(f.x, f.y, f.R * (0.55 + 0.25 * (1 - k)), f.a - f.arc / 2.6, f.a + f.arc / 2.6); ctx.stroke();
+        ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+        continue;
+      }
+      if (f.type === 'boom') {
+        const k = f.life / f.max, R = f.R * (1.1 - 0.5 * k);
+        ctx.globalAlpha = k;
+        const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R);
+        g.addColorStop(0, 'rgba(255,240,180,.95)'); g.addColorStop(0.5, 'rgba(255,140,40,.7)'); g.addColorStop(1, 'rgba(255,60,20,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, TAU); ctx.fill();
+        ctx.globalAlpha = 1;
+        continue;
+      }
       if (f.type !== 'bolt') continue;
       const k = f.life / f.max;
       ctx.globalAlpha = k;
@@ -1661,10 +1867,9 @@
       const b = document.createElement('button');
       b.className = 'sel' + (S[slotKey] === ch.id ? ' on' : '') + (owned ? '' : ' locked');
       b.appendChild(portrait(ch));
-      const w = WEAPONS[ch.weapon];
       b.insertAdjacentHTML('beforeend',
         `<div class="nm">${ch.name}</div><div class="tt">${ch.title}</div>` +
-        `<div class="wp">${w.icon} ${w.name}</div><div class="ds">${ch.desc}</div>` +
+        `<div class="ds">${ch.desc}</div>` +
         (owned ? '' : `<div class="cost${S.gold >= ch.cost ? '' : ' no'}">🔒 🪙 ${ch.cost}</div>`));
       b.addEventListener('click', () => {
         if (!owned) {
@@ -1749,7 +1954,7 @@
     // Resumen
     const g = gearStats(myGear());
     const total = Object.keys(g.st).map(k => `${STAT_LABELS[k][1](g.st[k])} ${STAT_LABELS[k][0]}`).join(' · ');
-    $('eqSummary').innerHTML = (g.weapon ? `Ataque básico: <b>${WEAPONS[g.weapon].icon} ${WEAPONS[g.weapon].name}</b> (sustituye al del personaje)<br>` : 'Sin arma equipada: usas el ataque básico de tu personaje.<br>') +
+    $('eqSummary').innerHTML = (g.weapon ? `Ataque principal: <b>${WEAPONS[g.weapon].icon} ${WEAPONS[g.weapon].name}</b><br>` : `Sin arma equipada: ataque principal <b>${WEAPONS.basico.icon} ${WEAPONS.basico.name}</b> (el básico).<br>`) +
       (total ? `Bonificaciones: ${total}` : 'Sin bonificaciones de equipo.');
     document.querySelectorAll('#eqTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === eqTab));
 
@@ -1770,7 +1975,7 @@
       d.innerHTML =
         `<div class="ic" style="font-size:30px">${it.icon}</div><div class="nm" style="color:${rar.color}">${it.name}</div>` +
         `<div class="rar" style="color:${rar.color}">${rar.name} · ${slot.name}${lvl ? ` · Nv. ${lvl}` : ''}</div>` +
-        (it.weapon ? `<div class="wp">Ataque básico: ${WEAPONS[it.weapon].icon} ${WEAPONS[it.weapon].name}</div>` : '') +
+        (it.weapon ? `<div class="wp">Ataque principal: ${WEAPONS[it.weapon].desc}</div>` : '') +
         `<div class="st">${fmtStats(it.stats, Math.max(1, lvl))}</div>`;
       const btns = document.createElement('div');
       btns.className = 'btns';
@@ -1914,7 +2119,7 @@
       : `Ya estaba al máximo: recibes 🪙 ${res.gold}`;
     $('rouResult').innerHTML = `<div class="big">${it.icon}</div><div class="rn" style="color:${rar.color}">${it.name}</div>` +
       `<div class="rs"><b style="color:${rar.color}">${rar.name}</b> · ${status}</div>` +
-      `<div class="rs">${fmtStats(it.stats, Math.max(1, S.items[it.id] || 1))}${it.weapon ? ` · Ataque básico: ${WEAPONS[it.weapon].icon} ${WEAPONS[it.weapon].name}` : ''}</div>`;
+      `<div class="rs">${fmtStats(it.stats, Math.max(1, S.items[it.id] || 1))}${it.weapon ? `<br>Ataque principal: ${WEAPONS[it.weapon].desc}` : ''}</div>`;
     Sound.play(it.rarity === 'legendario' || it.rarity === 'epico' ? 'evolve' : 'chest');
     $('rouAgain').disabled = false;
     $('rouAgain').style.opacity = S.gold >= ch.price ? '' : '.6';
@@ -1927,8 +2132,8 @@
     const g = gearStats(myGear());
     const extra = S.mode === 'local' ? ' (lo lleva J1)' : '';
     $('eqNote').innerHTML = (g.weapon
-      ? `🎒 Arma equipada${extra}: <b>${WEAPONS[g.weapon].icon} ${WEAPONS[g.weapon].name}</b>, que sustituye al ataque básico del personaje.`
-      : `🎒 Sin arma equipada: cada personaje usa su ataque básico.`) + ' <button id="eqNoteBtn">Cambiar equipo</button>';
+      ? `🎒 Ataque principal${extra}: <b>${WEAPONS[g.weapon].icon} ${WEAPONS[g.weapon].name}</b>.`
+      : `🎒 Ataque principal: <b>${WEAPONS.basico.icon} ${WEAPONS.basico.name}</b> (el básico). Consigue armas en los cofres.`) + ' <button id="eqNoteBtn">Cambiar equipo</button>';
     $('eqNoteBtn').addEventListener('click', () => { Sound.play('click'); openEquip('select'); });
   }
 
@@ -2062,6 +2267,8 @@
   const ETYPE_IDS = ['slime', 'murcielago', 'espectro', 'bruto', 'boss'];
   const ETYPE_IDX = { slime: 0, murcielago: 1, espectro: 2, bruto: 3, boss: 4 };
   const PICK_IDS = ['cofre', 'carne', 'iman', 'moneda'];
+  const BULLET_IDS = ['chispa', 'disco', 'bala', 'cohete'];
+  const BULLET_IDX = { chispa: 0, disco: 1, bala: 2, cohete: 3 };
   const PICK_IDX = { cofre: 0, carne: 1, iman: 2, moneda: 3 };
   const r1 = v => Math.round(v * 10) / 10;
   let lobby = null;      // { role, remote } mientras se prepara la sala
@@ -2090,7 +2297,12 @@
       snap.e.push(row);
     }
     G.netTexts = 0;
-    for (const b of G.bullets) if (!b.dead && near(b)) snap.bu.push(b.kind === 'chispa' ? [0, R(b.x), R(b.y), R(b.vx), R(b.vy), r1(b.r), b.ev ? 1 : 0, 0] : [1, R(b.x), R(b.y), 0, 0, r1(b.r), b.ev ? 1 : 0, r1(b.rot)]);
+    for (const b of G.bullets) {
+      if (b.dead || !near(b)) continue;
+      const k = BULLET_IDX[b.kind];
+      snap.bu.push(k === 1 ? [1, R(b.x), R(b.y), 0, 0, r1(b.r), b.ev ? 1 : 0, r1(b.rot)]
+        : [k, R(b.x), R(b.y), R(b.vx), R(b.vy), r1(b.r), b.ev ? 1 : 0, 0, b.color || 0]);
+    }
     for (const b of G.ebullets) if (!b.dead && near(b)) snap.eb.push([R(b.x), R(b.y), R(b.vx), R(b.vy), b.r, b.color]);
     for (const g of G.gems) if (!g.dead && near(g)) snap.gm.push(g.v === 1 ? [R(g.x), R(g.y)] : [R(g.x), R(g.y), g.v]);
     for (const k of G.pickups) if (!k.dead && near(k)) snap.pk.push([PICK_IDX[k.type], R(k.x), R(k.y), r1(k.t)]);
@@ -2161,7 +2373,7 @@
     }
     for (const id of [...G.emap.keys()]) if (!seen.has(id)) G.emap.delete(id);
     G.enemies = list;
-    G.bullets = sn.bu.map(v => ({ kind: v[0] ? 'disco' : 'chispa', x: v[1], y: v[2], vx: v[3], vy: v[4], r: v[5], ev: !!v[6], rot: v[7] }));
+    G.bullets = sn.bu.map(v => ({ kind: BULLET_IDS[v[0]], x: v[1], y: v[2], vx: v[3], vy: v[4], r: v[5], ev: !!v[6], rot: v[7], color: v[8] || '#fff' }));
     G.ebullets = sn.eb.map(v => ({ x: v[0], y: v[1], vx: v[2], vy: v[3], r: v[4], color: v[5] }));
     G.gems = sn.gm.map(v => ({ x: v[0], y: v[1], v: v[2] || 1 }));
     G.pickups = sn.pk.map(v => ({ type: PICK_IDS[v[0]], x: v[1], y: v[2], t: v[3] }));
@@ -2175,6 +2387,8 @@
       case 'b': burst(ev[1], ev[2], ev[3], ev[4], ev[5]); break;
       case 'm': toast(ev[1]); break;
       case 'z': G.effects.push({ type: 'bolt', x: ev[1], y: ev[2], R: ev[3], life: 0.3, max: 0.3, seed: ev[4], ev: !!ev[5] }); break;
+      case 'k': G.effects.push({ type: 'slash', x: ev[1], y: ev[2], a: ev[3], R: ev[4], arc: ev[5], life: 0.22, max: 0.22 }); break;
+      case 'x': G.effects.push({ type: 'boom', x: ev[1], y: ev[2], R: ev[3], life: 0.35, max: 0.35 }); break;
     }
   }
 
@@ -2476,7 +2690,7 @@
         const d = WEAPONS[w.id];
         h += w.evolved
           ? `<div class="row evo">${d.icon} ${d.evoName} ★</div>`
-          : `<div class="row">${d.icon} ${d.name} — Nv. ${w.lvl}${w.lvl >= WMAX ? ` (evoluciona con ${PASSIVES[d.evo].icon})` : ''}</div>`;
+          : `<div class="row">${d.icon} ${d.name} — Nv. ${w.lvl}${w.lvl >= WMAX && d.evo ? ` (evoluciona con ${PASSIVES[d.evo].icon})` : ''}${d.main ? ' · ataque principal' : ''}</div>`;
       }
       for (const id of Object.keys(p.passives)) h += `<div class="row">${PASSIVES[id].icon} ${PASSIVES[id].name} — Nv. ${p.passives[id]}</div>`;
     }
