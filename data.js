@@ -95,6 +95,12 @@ window.HN_DATA = {
       mods: { hp: -40, speed: 0.30, cd: 0.90, size: 0.75 },
       body: '#ffe0b8', hood: '#2bd4a0', cloak: '#1d5c4a', acc: 'cap', wide: 0.7,
     },
+    {
+      id: 'igor', name: 'Igor', title: 'el Alto', weapon: 'rayo', cost: 550,
+      desc: 'Llega a todo: +20% área, +40% recogida, +5% velocidad y +20 vida. Torpe (-10% daño) y es un blanco grande.',
+      mods: { area: 0.20, magnet: 0.40, speed: 0.05, hp: 20, dmg: -0.10, size: 1.15 },
+      body: '#c8e6c9', hood: '#2b2d42', cloak: '#4a3f6b', acc: 'tophat', wide: 0.75, tall: 1.45,
+    },
   ],
 
   MAPS: [

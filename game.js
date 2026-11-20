@@ -1226,10 +1226,12 @@
     // cuerpo
     if (glow) { ctx.shadowColor = ch.body; ctx.shadowBlur = 16; }
     ctx.fillStyle = ch.body;
-    ctx.beginPath(); ctx.ellipse(x, y + bob, r * (ch.wide || 1), r, 0, 0, TAU); ctx.fill();
+    // Los personajes altos crecen hacia arriba: los pies se quedan en el mismo sitio.
+    const ry = r * (ch.tall || 1), lift = ry - r;
+    ctx.beginPath(); ctx.ellipse(x, y + bob - lift, r * (ch.wide || 1), ry, 0, 0, TAU); ctx.fill();
     ctx.shadowBlur = 0;
-    // accesorio
-    const cy = y + bob;
+    // accesorio (cy es el centro de la "cabeza")
+    const cy = y + bob - lift * 2;
     ctx.fillStyle = ch.hood;
     switch (ch.acc) {
       case 'hood':
@@ -1274,6 +1276,15 @@
         ctx.fillStyle = '#f2e6c9';
         ctx.beginPath(); ctx.moveTo(x - w * 0.8, cy - r * 0.6); ctx.quadraticCurveTo(x - w * 1.5, cy - r * 1.1, x - w * 1.25, cy - r * 1.7); ctx.lineTo(x - w * 0.5, cy - r * 0.85); ctx.fill();
         ctx.beginPath(); ctx.moveTo(x + w * 0.8, cy - r * 0.6); ctx.quadraticCurveTo(x + w * 1.5, cy - r * 1.1, x + w * 1.25, cy - r * 1.7); ctx.lineTo(x + w * 0.5, cy - r * 0.85); ctx.fill();
+        break;
+      }
+      case 'tophat': {
+        // Chistera alta para parecer aún más alto.
+        const w = r * (ch.wide || 1);
+        ctx.fillRect(x - w * 1.25, cy - r * 0.95, w * 2.5, r * 0.22);
+        ctx.fillRect(x - w * 0.8, cy - r * 2.05, w * 1.6, r * 1.15);
+        ctx.fillStyle = '#c0392b';
+        ctx.fillRect(x - w * 0.8, cy - r * 1.15, w * 1.6, r * 0.22);
         break;
       }
       case 'cap': {
@@ -1632,7 +1643,9 @@
     const pc = c.getContext('2d');
     pc.scale(4, 4);
     ctx = pc;
-    drawHero(16, 15, 9, ch, { x: 0.4, y: 0.6 }, 0, false);
+    // Los personajes altos se dibujan algo más pequeños y más abajo para que quepan enteros.
+    if (ch.tall) drawHero(16, 21.5, 7, ch, { x: 0.4, y: 0.6 }, 0, false);
+    else drawHero(16, 15, 9, ch, { x: 0.4, y: 0.6 }, 0, false);
     ctx = mainCtx;
     return c;
   }

@@ -80,6 +80,7 @@ Se desbloquean con oro en la pantalla de selección.
 | Salim, el Inútil | ✨ Chispa Arcana | -25% daño, -10% velocidad; +40% oro y +25% experiencia | 🪙 100 |
 | Iván, el Tanque | 🔥 Halo Ardiente | +80 vida, +2 armadura, +1 vida/s; -20% velocidad y más grande | 🪙 700 |
 | Pol, el Flaco | ✨ Chispa Arcana | +30% velocidad, -10% recarga, más pequeño; solo 60 de vida | 🪙 500 |
+| Igor, el Alto | ⚡ Rayo Celeste | +20% área, +40% recogida, +5% velocidad, +20 vida; -10% daño y blanco grande | 🪙 550 |
 
 ### Equipo y cofres
 
