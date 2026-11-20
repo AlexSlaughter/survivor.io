@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#0b0d17">
+  <title>Horda Nocturna</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <button id="pauseBtn" class="hidden" aria-label="Pausa">❚❚</button>
+  <div id="toast" class="hidden"></div>
+
+  <div id="menu" class="overlay">
+    <div class="panel">
+      <h1>HORDA<br><span>NOCTURNA</span></h1>
+      <p class="tag">Sobrevive 10 minutos y derrota al <b>Rey del Abismo</b>.</p>
+      <ul class="help">
+        <li>🎮 Muévete con <b>WASD</b> / <b>flechas</b> o arrastrando el dedo.</li>
+        <li>✨ Tus armas atacan solas. Recoge cristales para subir de nivel.</li>
+        <li>⭐ Lleva un arma a <b>Nv. 5</b>, consigue su objeto clave y abre un <b>cofre</b> de élite para <b>evolucionarla</b>.</li>
+        <li>⏸ <b>P</b> / <b>Esc</b> para pausar.</li>
+      </ul>
+      <button id="playBtn" class="primary">Jugar</button>
+      <p id="bestTime" class="best"></p>
+    </div>
+  </div>
+
+  <div id="levelup" class="overlay hidden">
+    <div class="panel wide">
+      <h2>¡Subes de nivel!</h2>
+      <div id="choices"></div>
+    </div>
+  </div>
+
+  <div id="pause" class="overlay hidden">
+    <div class="panel">
+      <h2>Pausa</h2>
+      <div id="build"></div>
+      <button id="resumeBtn" class="primary">Continuar</button>
+      <button id="quitBtn">Abandonar</button>
+    </div>
+  </div>
+
+  <div id="end" class="overlay hidden">
+    <div class="panel">
+      <h2 id="endTitle"></h2>
+      <div id="endStats"></div>
+      <button id="retryBtn" class="primary">Jugar otra vez</button>
+      <button id="menuBtn">Menú</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
