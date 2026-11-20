@@ -48,6 +48,13 @@ Se desbloquean con oro en la pantalla de selección.
 
 Al terminar cada partida ganas oro: las monedas recogidas, más un extra por tiempo y por jefes derrotados, multiplicado por el mapa. En la **tienda** compras mejoras permanentes: Poder, Vitalidad, Armadura, Agilidad, Celeridad, Magnetismo, Sabiduría (experiencia), Codicia (oro), **Visión** (una cuarta opción al subir de nivel) y **Renacer** (revives una vez por partida). El progreso se guarda en el navegador.
 
+### Cuentas y guardado del progreso
+
+- **Sin cuenta:** el progreso (oro, tienda, personajes, mapas y récords) se guarda en el navegador de ese dispositivo.
+- **Con cuenta:** puedes iniciar sesión con **Google** o con **correo y contraseña**. El progreso se sube a la nube automáticamente y se recupera al entrar desde cualquier dispositivo. Si ya tenías progreso en el dispositivo, se combina con el de la cuenta.
+- **Copia de seguridad sin cuenta:** en *Cuenta → Copia de seguridad* tienes un código para copiar y pegar en otro navegador o dispositivo.
+- La partida en curso no se guarda: el oro de una partida se suma al terminarla.
+
 ### Sonido
 
 Los efectos y la música se generan en tiempo real con Web Audio, sin archivos de audio. La música se acelera durante los jefes. Puedes activarlos o desactivarlos desde el menú o la pausa.
@@ -65,6 +72,18 @@ Los efectos y la música se generan en tiempo real con Web Audio, sin archivos d
 - En pantallas táctiles aparece un joystick virtual allí donde pongas el dedo.
 - Se respetan las zonas seguras de móviles con *notch*.
 - Los menús se reorganizan según el ancho y el alto disponibles.
+
+## Configurar el inicio de sesión (Firebase)
+
+El juego no incluye servidor propio. Las cuentas usan **Firebase**, el servicio gratuito de Google. Hasta que lo configures, el juego funciona igual, pero sin cuentas.
+
+1. Entra en <https://console.firebase.google.com>, pulsa **Crear un proyecto** y sigue los pasos (Google Analytics no hace falta).
+2. En la página del proyecto, pulsa el icono **Web** (`</>`) para registrar una app web. Copia los valores de `firebaseConfig` (`apiKey`, `authDomain`, `projectId`, `appId`) en **`firebase-config.js`**.
+3. Ve a **Authentication → Comenzar** y, en *Método de inicio de sesión*, activa **Google** y **Correo electrónico/contraseña**.
+4. En **Authentication → Configuración → Dominios autorizados**, añade el dominio donde publiques el juego (por ejemplo `alexslaughter.github.io`).
+5. Ve a **Firestore Database → Crear base de datos** (modo producción). En la pestaña **Reglas**, pega el contenido de **`firestore.rules`** y pulsa **Publicar**. Así cada jugador solo puede leer y escribir su propio progreso.
+
+Los valores de `firebase-config.js` no son secretos y se pueden subir al repositorio; la seguridad la dan las reglas del paso 5. El plan gratuito de Firebase es de sobra para este juego.
 
 ## Ejecutar
 
@@ -84,4 +103,7 @@ Para publicarlo gratis, activa **GitHub Pages** en *Settings → Pages* con esta
 - `style.css`: estilos adaptables de la interfaz.
 - `data.js`: datos de armas, objetos, enemigos, personajes, mapas y tienda.
 - `audio.js`: efectos de sonido y música procedural.
+- `cloud.js`: inicio de sesión y guardado en la nube con Firebase.
+- `firebase-config.js`: configuración de tu proyecto de Firebase.
+- `firestore.rules`: reglas de seguridad de la base de datos.
 - `game.js`: motor del juego (entrada, aparición de enemigos, armas, colisiones con rejilla espacial, renderizado, menús y guardado).

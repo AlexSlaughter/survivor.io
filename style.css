@@ -177,3 +177,26 @@ button.big { font-size: 19px; padding: 14px 40px; }
   animation: toastIn .25s ease-out;
 }
 @keyframes toastIn { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* ---------- Cuenta ---------- */
+input, textarea {
+  font: inherit; font-size: 16px; color: #eef1ff; width: 100%;
+  background: #12162f; border: 1px solid #3a428a; border-radius: 10px;
+  padding: 12px; margin: 5px 0; -webkit-user-select: text; user-select: text;
+}
+input:focus, textarea:focus { outline: 2px solid #7f8cff; border-color: transparent; }
+textarea { resize: vertical; font-family: ui-monospace, Menlo, monospace; font-size: 13px; word-break: break-all; }
+.accstatus { margin: 0 0 12px; color: #c7cbf0; }
+.accstatus b { color: #fff; }
+.msg { min-height: 1.2em; margin: 8px 0 0; font-size: 14px; color: #6fffb0; }
+.msg.err { color: #ff7a8a; }
+button.google { display: inline-flex; align-items: center; gap: 10px; background: #fff; color: #222; border: none; width: 100%; justify-content: center; margin: 6px 0; }
+button.google:hover { background: #eef0ff; }
+.divider { display: flex; align-items: center; gap: 10px; color: #8f95c8; font-size: 13px; margin: 10px 0 4px; }
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: #343c84; }
+#emailForm .row2 button { flex: 1; }
+#accUser { display: flex; flex-wrap: wrap; justify-content: center; }
+.backup { text-align: left; margin-top: 16px; padding: 10px 12px; background: rgba(18, 22, 47, .7); border: 1px solid #2d3470; border-radius: 12px; }
+.backup summary { cursor: pointer; font-weight: 700; color: #c7cbf0; }
+.backup .sub { font-size: 13px; margin: 8px 0; }
+.backup button { width: 100%; margin: 4px 0 8px; }

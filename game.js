@@ -52,17 +52,105 @@
 
   // ---------- Guardado ----------
   const SAVE_KEY = 'hn_save_v1';
-  const defaultSave = () => ({ gold: 0, up: {}, chars: ['aria'], char: 'aria', map: 'bosque', best: {}, wins: {}, sfx: true, music: true });
+  const defaultSave = () => ({ gold: 0, up: {}, chars: ['aria'], char: 'aria', map: 'bosque', best: {}, wins: {}, sfx: true, music: true, t: 0 });
   function loadSave() {
     let s = null;
     try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* sin almacenamiento */ }
     const d = defaultSave();
-    if (s && typeof s === 'object') return Object.assign(d, s);
+    if (s && typeof s === 'object') {
+      try {
+        const v = sanitize(s);
+        // Guardados de versiones anteriores sin fecha: más recientes que uno vacío, más antiguos que cualquier otro.
+        if (!v.t && (v.gold || v.chars.length > 1 || Object.keys(v.up).length || Object.keys(v.best).length)) v.t = 1;
+        return v;
+      } catch (e) { /* guardado dañado */ }
+    }
     try { const b = +localStorage.getItem('hn_best'); if (b) d.best.bosque = b; } catch (e) { /* nada */ }
     return d;
   }
   const S = loadSave();
-  function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* sin almacenamiento */ } }
+  function saveLocal() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* sin almacenamiento */ } }
+  function save() { S.t = Date.now(); saveLocal(); queueCloud(); }
+
+  // Limpia un guardado de origen externo (nube, código o localStorage) para que solo tenga valores válidos.
+  function sanitize(o) {
+    if (!o || typeof o !== 'object') throw new Error('guardado no válido');
+    const d = defaultSave();
+    d.gold = Number.isFinite(+o.gold) ? Math.max(0, Math.floor(+o.gold)) : 0;
+    for (const it of SHOP) {
+      const l = Math.floor(+(o.up && o.up[it.id]) || 0);
+      if (l > 0) d.up[it.id] = Math.min(it.max, l);
+    }
+    const chars = Array.isArray(o.chars) ? o.chars : [];
+    for (const c of CHARS) if (c.id !== 'aria' && chars.includes(c.id)) d.chars.push(c.id);
+    for (const m of MAPS) {
+      const b = +(o.best && o.best[m.id]) || 0, w = Math.floor(+(o.wins && o.wins[m.id]) || 0);
+      if (b > 0) d.best[m.id] = b;
+      if (w > 0) d.wins[m.id] = w;
+    }
+    if (d.chars.includes(o.char)) d.char = o.char;
+    if (MAPS.some(m => m.id === o.map)) d.map = o.map;
+    d.sfx = o.sfx !== false; d.music = o.music !== false;
+    d.t = Number.isFinite(+o.t) ? +o.t : 0;
+    return d;
+  }
+
+  // Combina dos guardados: los desbloqueos se suman y el oro se toma del guardado más reciente.
+  function mergeSaves(a, b) {
+    const ta = a.t || 0, tb = b.t || 0;
+    // Con la misma fecha (p. ej. guardados sin fecha) se conserva el que tenga más oro.
+    const newer = tb > ta ? b : tb < ta ? a : (b.gold > a.gold ? b : a);
+    const m = Object.assign(defaultSave(), a);
+    m.gold = newer.gold;
+    m.up = {};
+    for (const it of SHOP) { const l = Math.max(a.up[it.id] || 0, b.up[it.id] || 0); if (l) m.up[it.id] = l; }
+    m.chars = CHARS.map(c => c.id).filter(id => a.chars.includes(id) || b.chars.includes(id));
+    m.best = {}; m.wins = {};
+    for (const mp of MAPS) {
+      const bt = Math.max(a.best[mp.id] || 0, b.best[mp.id] || 0), w = Math.max(a.wins[mp.id] || 0, b.wins[mp.id] || 0);
+      if (bt) m.best[mp.id] = bt;
+      if (w) m.wins[mp.id] = w;
+    }
+    m.t = Math.max(a.t || 0, b.t || 0);
+    if (!m.chars.includes(m.char)) m.char = 'aria';
+    return m;
+  }
+  function replaceSave(m) { for (const k of Object.keys(S)) delete S[k]; Object.assign(S, m); }
+
+  // ---------- Nube (ver cloud.js) ----------
+  const Cloud = window.Cloud || { configured: false, ready: true, user: null };
+  let cloudTimer = 0, cloudBusy = false, lastPull = 0, cloudErr = '';
+  function queueCloud() {
+    if (!Cloud.user) return;
+    clearTimeout(cloudTimer);
+    cloudTimer = setTimeout(pushCloud, 1500);
+  }
+  async function pushCloud() {
+    if (!Cloud.user) return false;
+    try { await Cloud.store(S); cloudErr = ''; return true; }
+    catch (e) { cloudErr = Cloud.message(e); return false; }
+    finally { renderAccount(); }
+  }
+  async function pullCloud(force) {
+    if (!Cloud.user || cloudBusy) return;
+    if (!force && Date.now() - lastPull < 30000) return;
+    cloudBusy = true; lastPull = Date.now();
+    try {
+      const remote = await Cloud.load();
+      if (remote) { replaceSave(mergeSaves(S, sanitize(remote))); saveLocal(); }
+      await Cloud.store(S);
+      cloudErr = '';
+    } catch (e) {
+      cloudErr = Cloud.message(e);
+    } finally {
+      cloudBusy = false;
+    }
+    if (state === 'menu') {
+      refreshGold(); updateBest(); renderAccount();
+      if (!$('select').classList.contains('hidden')) renderSelect();
+      if (!$('shop').classList.contains('hidden')) renderShop();
+    }
+  }
   const upLvl = id => S.up[id] || 0;
   const shopCost = it => Math.round(it.cost * (1 + upLvl(it.id) * 0.75));
   const mapUnlocked = m => !m.unlock || (S.best[m.unlock.map] || 0) >= m.unlock.time;
@@ -1184,7 +1272,7 @@
   }
 
   // ---------- Menús ----------
-  const overlays = ['menu', 'help', 'select', 'shop', 'levelup', 'pause', 'end'];
+  const overlays = ['menu', 'help', 'account', 'select', 'shop', 'levelup', 'pause', 'end'];
   function showOnly(id) { for (const o of overlays) $(o).classList.toggle('hidden', o !== id); }
 
   function refreshGold() { document.querySelectorAll('.goldAmt').forEach(el => { el.textContent = S.gold; }); }
@@ -1296,7 +1384,97 @@
     $('bestTime').textContent = b > 0 ? `Mejor tiempo en ${mapById(S.map).name}: ${fmtTime(b)}` : '';
   }
 
-  function openMenu() { refreshGold(); syncToggles(); updateBest(); showOnly('menu'); }
+  function openMenu() { refreshGold(); syncToggles(); updateBest(); renderAccount(); showOnly('menu'); pullCloud(false); }
+
+  // ---------- Pantalla de cuenta ----------
+  const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function setMsg(text, err) { const m = $('accMsg'); m.textContent = text; m.classList.toggle('err', !!err); }
+  const exportCode = () => 'HN1.' + btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+  function parseCode(str) {
+    const c = str.trim().replace(/\s+/g, '');
+    if (!c.startsWith('HN1.')) throw new Error('código no válido');
+    return sanitize(JSON.parse(decodeURIComponent(escape(atob(c.slice(4))))));
+  }
+
+  function renderAccount() {
+    const st = $('accStatus'), badge = $('accBadge');
+    $('accLogin').classList.toggle('hidden', !(Cloud.configured && Cloud.ready && !Cloud.user));
+    $('accUser').classList.toggle('hidden', !Cloud.user);
+    if (!Cloud.configured) {
+      st.textContent = 'El inicio de sesión todavía no está configurado en este juego. Mientras tanto, puedes usar la copia de seguridad de abajo.';
+      badge.textContent = '';
+    } else if (!Cloud.ready) {
+      st.textContent = 'Conectando…';
+      badge.textContent = '';
+    } else if (Cloud.user) {
+      const u = Cloud.user;
+      st.innerHTML = `Conectado como <b>${esc(u.name)}</b>` + (u.email && u.email !== u.name ? `<br><small>${esc(u.email)}</small>` : '') +
+        '<br>Tu progreso se guarda en la nube automáticamente.';
+      badge.textContent = `☁️ ${u.name}` + (cloudErr ? ' · ⚠ sin sincronizar' : ' · progreso en la nube');
+    } else {
+      st.textContent = 'Inicia sesión para guardar tu progreso en la nube y seguir jugando desde cualquier dispositivo.';
+      badge.textContent = '👤 Sin sesión: el progreso solo se guarda en este dispositivo';
+    }
+    if (Cloud.error) { setMsg(Cloud.error, true); Cloud.error = ''; }
+    $('saveCode').value = exportCode();
+  }
+
+  async function authAction(fn, okText) {
+    setMsg('Conectando…');
+    try { await fn(); setMsg(okText || ''); }
+    catch (e) { setMsg(Cloud.message ? Cloud.message(e) : String(e), true); Sound.play('error'); }
+  }
+  $('googleBtn').addEventListener('click', () => authAction(() => Cloud.loginGoogle()));
+  $('emailForm').addEventListener('submit', e => {
+    e.preventDefault();
+    authAction(() => Cloud.loginEmail($('accEmail').value.trim(), $('accPass').value));
+  });
+  $('registerBtn').addEventListener('click', () => {
+    if (!$('emailForm').reportValidity()) return;
+    authAction(() => Cloud.register($('accEmail').value.trim(), $('accPass').value));
+  });
+  $('syncBtn').addEventListener('click', async () => {
+    setMsg('Sincronizando…');
+    await pullCloud(true);
+    setMsg(cloudErr || '✔ Progreso sincronizado', !!cloudErr);
+  });
+  $('logoutBtn').addEventListener('click', () => authAction(async () => {
+    clearTimeout(cloudTimer);
+    // Sube el progreso antes de salir; si falla, no se cierra la sesión para no perder nada.
+    if (!(await pushCloud())) throw new Error(cloudErr);
+    await Cloud.logout();
+    // Este dispositivo vuelve a empezar: el progreso queda guardado en la cuenta.
+    const prefs = { sfx: S.sfx, music: S.music };
+    replaceSave(Object.assign(defaultSave(), prefs));
+    saveLocal();
+    refreshGold(); updateBest(); renderAccount();
+  }, 'Sesión cerrada. Tu progreso sigue guardado en tu cuenta.'));
+  $('copyCode').addEventListener('click', () => {
+    const ta = $('saveCode');
+    ta.value = exportCode();
+    const done = () => setMsg('✔ Código copiado');
+    if (navigator.clipboard) navigator.clipboard.writeText(ta.value).then(done, () => { ta.select(); document.execCommand('copy'); done(); });
+    else { ta.select(); document.execCommand('copy'); done(); }
+  });
+  $('importBtn').addEventListener('click', () => {
+    try {
+      const imp = parseCode($('importCode').value);
+      replaceSave(mergeSaves(S, imp));
+      save();
+      $('importCode').value = '';
+      refreshGold(); updateBest(); renderAccount();
+      Sound.play('buy');
+      setMsg('✔ Progreso cargado y combinado con el actual');
+    } catch (e) {
+      Sound.play('error');
+      setMsg('El código no es válido. Cópialo completo, empieza por «HN1.».', true);
+    }
+  });
+  addEventListener('cloud', renderAccount);
+  addEventListener('cloud-login', async () => {
+    await pullCloud(true);
+    setMsg(cloudErr || '✔ Sesión iniciada. Progreso sincronizado.', !!cloudErr);
+  });
 
   // ---------- Flujo de partida ----------
   function start() {
@@ -1383,6 +1561,7 @@
   click('playBtn', () => { renderSelect(); showOnly('select'); });
   click('shopBtn', () => { renderShop(); showOnly('shop'); });
   click('helpBtn', () => showOnly('help'));
+  click('accountBtn', () => { setMsg(''); renderAccount(); showOnly('account'); });
   click('startBtn', start);
   click('retryBtn', start);
   click('menuBtn', toMenu);
