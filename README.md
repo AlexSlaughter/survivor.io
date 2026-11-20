@@ -12,6 +12,22 @@ Sobrevive 10 minutos a oleadas cada vez más grandes de monstruos y derrota al *
 - **Evolucionar:** lleva un arma a **Nv. 5**, consigue su objeto clave y abre un **cofre** (lo sueltan élites y jefes).
 - **Pausa:** `P` / `Esc` o el botón ❚❚.
 
+### Cooperativo local (2 jugadores)
+
+En la pantalla de selección, elige **👥 2 jugadores (local)** y un personaje para cada uno.
+
+| | Jugador 1 | Jugador 2 |
+|---|---|---|
+| Teclado | WASD | Flechas |
+| Mando | Primer mando | Segundo mando |
+| Pantalla táctil | Mitad izquierda | Mitad derecha |
+
+- La **experiencia, el nivel y el oro** son compartidos. Las mejoras se eligen **por turnos**: cada subida de nivel le toca a un jugador, que mejora sus propias armas.
+- La cámara sigue a los dos, y ninguno puede salirse de la pantalla.
+- Si un jugador **cae**, su compañero lo reanima quedándose a su lado 3 segundos. Si el caído está fuera de la pantalla, una flecha indica dónde está. La partida termina cuando caen los dos.
+- Hay más enemigos, más resistentes y con jefes más duros, pero se sube de nivel más rápido.
+- Con mando: **Start** pausa y **A/B/X/Y** eligen la mejora 1-4.
+
 ### Armas
 
 | Arma | Efecto | Objeto clave | Evolución |

@@ -52,7 +52,7 @@
 
   // ---------- Guardado ----------
   const SAVE_KEY = 'hn_save_v1';
-  const defaultSave = () => ({ gold: 0, up: {}, chars: ['aria'], char: 'aria', map: 'bosque', best: {}, wins: {}, sfx: true, music: true, t: 0 });
+  const defaultSave = () => ({ gold: 0, up: {}, chars: ['aria'], char: 'aria', map: 'bosque', best: {}, wins: {}, sfx: true, music: true, t: 0, coop: false, char2: 'aria' });
   function loadSave() {
     let s = null;
     try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* sin almacenamiento */ }
@@ -89,6 +89,8 @@
       if (w > 0) d.wins[m.id] = w;
     }
     if (d.chars.includes(o.char)) d.char = o.char;
+    if (d.chars.includes(o.char2)) d.char2 = o.char2;
+    d.coop = o.coop === true;
     if (MAPS.some(m => m.id === o.map)) d.map = o.map;
     d.sfx = o.sfx !== false; d.music = o.music !== false;
     d.t = Number.isFinite(+o.t) ? +o.t : 0;
@@ -113,6 +115,7 @@
     }
     m.t = Math.max(a.t || 0, b.t || 0);
     if (!m.chars.includes(m.char)) m.char = 'aria';
+    if (!m.chars.includes(m.char2)) m.char2 = 'aria';
     return m;
   }
   function replaceSave(m) { for (const k of Object.keys(S)) delete S[k]; Object.assign(S, m); }
@@ -160,14 +163,15 @@
 
   // ---------- Estado ----------
   const WMAX = 5, SLOTS = 4, MAX_ENEMIES = 380;
+  const PCOLORS = ['#4de1ff', '#ff6fb5'];
   let G = null;
   let state = 'menu'; // menu | play | levelup | paused | over | win
 
-  function newGame() {
-    const ch = charById(S.char), map = mapById(S.map), m = ch.mods;
+  function makePlayer(ch, idx, x) {
+    const m = ch.mods;
     const p = {
-      x: 0, y: 0, r: 14, hp: 100, maxHp: 100, inv: 0, face: { x: 1, y: 0 }, side: 1, walk: 0, ch,
-      level: 1, xp: 0, xpNext: 5, kills: 0,
+      idx, x, y: 0, r: 14, hp: 100, maxHp: 100, inv: 0, face: { x: 1, y: 0 }, side: 1, walk: 0, ch,
+      color: PCOLORS[idx], down: false, reviveT: 0, revives: upLvl('renacer'),
       stats: { dmg: 1, cd: 1, speed: 1, regen: 0, magnet: 1, area: 1, proj: 0, armor: 0, xp: 1, gold: 1 },
       weapons: [], passives: {},
     };
@@ -185,25 +189,52 @@
     s.xp += 0.08 * upLvl('sabiduria');
     s.gold += 0.10 * upLvl('codicia');
     p.hp = p.maxHp;
+    return p;
+  }
 
+  function newGame() {
+    const map = mapById(S.map), coop = !!S.coop;
+    const players = [makePlayer(charById(S.char), 0, coop ? -30 : 0)];
+    if (coop) players.push(makePlayer(charById(S.char2), 1, 30));
     G = {
       time: 0, spawnAcc: 0, nextElite: 60, nextSwarm: 45, bossIdx: 0, shake: 0, pending: 0,
       boss: null, opts: [], map, gold: 0, coins: 0, bossKills: 0,
-      revives: upLvl('renacer'), choices: 3 + upLvl('vision'),
-      p, enemies: [], bullets: [], ebullets: [], gems: [], pickups: [], particles: [], texts: [], effects: [],
+      coop, players, p: players[0], cx: 0, cy: 0,
+      level: 1, xp: 0, xpNext: 5, kills: 0, chooser: 0, chooserP: null,
+      // Con dos jugadores aparecen más enemigos y son más resistentes.
+      diffHp: coop ? 1.25 : 1, diffRate: coop ? 1.4 : 1, diffBoss: coop ? 1.6 : 1,
+      choices: 3 + upLvl('vision'),
+      enemies: [], bullets: [], ebullets: [], gems: [], pickups: [], particles: [], texts: [], effects: [],
     };
-    addWeapon(ch.weapon);
+    for (const p of players) addWeapon(p, p.ch.weapon);
   }
 
-  const hasWeapon = id => G.p.weapons.find(w => w.id === id);
-  const addWeapon = id => G.p.weapons.push({ id, lvl: 1, t: 0.3, evolved: false, angle: 0 });
-  function addPassive(id) { G.p.passives[id] = (G.p.passives[id] || 0) + 1; PASSIVES[id].apply(G.p); }
-  const canEvolve = w => !w.evolved && w.lvl >= WMAX && !!G.p.passives[WEAPONS[w.id].evo];
-  function heal(n) { const p = G.p; p.hp = Math.min(p.maxHp, p.hp + n); addText(p.x, p.y - 24, '+' + n, '#6fffb0'); }
+  const alive = () => G.players.filter(p => !p.down);
+  function nearestPlayer(x, y) {
+    let best = null, bd = Infinity;
+    for (const p of G.players) {
+      if (p.down) continue;
+      const d = dist2(x, y, p.x, p.y);
+      if (d < bd) { bd = d; best = p; }
+    }
+    return best;
+  }
+  const hasWeapon = (p, id) => p.weapons.find(w => w.id === id);
+  const addWeapon = (p, id) => p.weapons.push({ id, lvl: 1, t: 0.3, evolved: false, angle: 0 });
+  function addPassive(p, id) { p.passives[id] = (p.passives[id] || 0) + 1; PASSIVES[id].apply(p); }
+  const canEvolve = (p, w) => !w.evolved && w.lvl >= WMAX && !!p.passives[WEAPONS[w.id].evo];
+  function heal(p, n) { p.hp = Math.min(p.maxHp, p.hp + n); addText(p.x, p.y - 24, '+' + n, '#6fffb0'); }
+  const pname = p => `J${p.idx + 1}`;
+  const ptag = p => (G.coop ? pname(p) + ': ' : '');
 
   // ---------- Entrada ----------
+  // Teclado: en solitario WASD y flechas; en cooperativo J1 usa WASD y J2 las flechas.
+  // Táctil: en cooperativo, la mitad izquierda de la pantalla es de J1 y la derecha de J2.
+  // Mandos: el primero es de J1 y el segundo de J2.
   const keys = {};
-  const joy = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
+  const newJoy = () => ({ active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 });
+  const joys = [newJoy(), newJoy()];
+  const releaseJoys = () => { for (const j of joys) j.active = false; };
   addEventListener('keydown', e => {
     keys[e.code] = true;
     if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
@@ -214,34 +245,71 @@
     if ((state === 'over' || state === 'win') && e.code === 'Enter' && !(e.target instanceof HTMLButtonElement)) start();
   });
   addEventListener('keyup', e => { keys[e.code] = false; });
-  addEventListener('blur', () => { for (const k in keys) keys[k] = false; joy.active = false; });
+  addEventListener('blur', () => { for (const k in keys) keys[k] = false; releaseJoys(); });
   canvas.addEventListener('pointerdown', e => {
     if (state !== 'play') return;
-    joy.active = true; joy.id = e.pointerId;
-    joy.ox = joy.x = e.clientX; joy.oy = joy.y = e.clientY;
+    const j = joys[G.coop && e.clientX >= W / 2 ? 1 : 0];
+    if (j.active) return;
+    j.active = true; j.id = e.pointerId;
+    j.ox = j.x = e.clientX; j.oy = j.y = e.clientY;
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* nada */ }
   });
   canvas.addEventListener('pointermove', e => {
-    if (!joy.active || e.pointerId !== joy.id) return;
-    joy.x = e.clientX; joy.y = e.clientY;
+    const j = joys.find(q => q.active && q.id === e.pointerId);
+    if (!j) return;
+    j.x = e.clientX; j.y = e.clientY;
     // El joystick sigue al dedo si se aleja demasiado.
-    const dx = joy.x - joy.ox, dy = joy.y - joy.oy, l = Math.hypot(dx, dy);
-    if (l > JR * 1.6) { joy.ox = joy.x - dx / l * JR * 1.6; joy.oy = joy.y - dy / l * JR * 1.6; }
+    const dx = j.x - j.ox, dy = j.y - j.oy, l = Math.hypot(dx, dy);
+    if (l > JR * 1.6) { j.ox = j.x - dx / l * JR * 1.6; j.oy = j.y - dy / l * JR * 1.6; }
   });
-  const endJoy = e => { if (e.pointerId === joy.id) joy.active = false; };
+  const endJoy = e => { for (const j of joys) if (j.id === e.pointerId) j.active = false; };
   canvas.addEventListener('pointerup', endJoy);
   canvas.addEventListener('pointercancel', endJoy);
   canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-  function inputDir() {
+  const getPads = () => Array.from((navigator.getGamepads && navigator.getGamepads()) || []).filter(Boolean);
+  const padPrev = [];
+  // Start pausa; A/B/X/Y eligen la mejora 1-4.
+  function pollPads() {
+    getPads().forEach((pad, i) => {
+      const now = pad.buttons.map(b => b.pressed), prev = padPrev[i] || [];
+      const hit = k => now[k] && !prev[k];
+      padPrev[i] = now;
+      if (hit(9)) togglePause();
+      if (state === 'levelup') {
+        for (let k = 0; k < 4; k++) if (hit(k) && G.opts[k]) { choose(G.opts[k]); break; }
+      }
+    });
+  }
+
+  function inputDir(idx) {
     let dx = 0, dy = 0;
-    if (keys.KeyW || keys.ArrowUp) dy -= 1;
-    if (keys.KeyS || keys.ArrowDown) dy += 1;
-    if (keys.KeyA || keys.ArrowLeft) dx -= 1;
-    if (keys.KeyD || keys.ArrowRight) dx += 1;
-    if (joy.active) {
-      const jx = joy.x - joy.ox, jy = joy.y - joy.oy, l = Math.hypot(jx, jy);
+    if (!G.coop || idx === 0) {
+      if (keys.KeyW) dy -= 1;
+      if (keys.KeyS) dy += 1;
+      if (keys.KeyA) dx -= 1;
+      if (keys.KeyD) dx += 1;
+    }
+    if (!G.coop || idx === 1) {
+      if (keys.ArrowUp) dy -= 1;
+      if (keys.ArrowDown) dy += 1;
+      if (keys.ArrowLeft) dx -= 1;
+      if (keys.ArrowRight) dx += 1;
+    }
+    const j = joys[idx];
+    if (j.active) {
+      const jx = j.x - j.ox, jy = j.y - j.oy, l = Math.hypot(jx, jy);
       if (l > 6) { const m = Math.min(l, JR) / JR; dx += jx / l * m; dy += jy / l * m; }
+    }
+    const pads = getPads(), pad = G.coop ? pads[idx] : pads[0];
+    if (pad) {
+      const ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
+      if (Math.hypot(ax, ay) > 0.2) { dx += ax; dy += ay; }
+      const b = k => pad.buttons[k] && pad.buttons[k].pressed;
+      if (b(12)) dy -= 1;
+      if (b(13)) dy += 1;
+      if (b(14)) dx -= 1;
+      if (b(15)) dx += 1;
     }
     const l = Math.hypot(dx, dy);
     if (l > 1) { dx /= l; dy /= l; }
@@ -323,7 +391,7 @@
 
   function kill(e) {
     e.dead = true;
-    G.p.kills++;
+    G.kills++;
     Sound.play('kill', 0.04);
     burst(e.x, e.y, e.color, e.boss ? 50 : e.elite ? 20 : 6, e.boss ? 260 : 120);
     dropGem(e.x, e.y, e.xp);
@@ -358,40 +426,43 @@
     G.gems.push({ x: x + rand(-4, 4), y: y + rand(-4, 4), v, mag: false, sp: 0 });
   }
 
-  function gainXp(v) {
-    const p = G.p;
-    p.xp += v * p.stats.xp;
-    while (p.xp >= p.xpNext) {
-      p.xp -= p.xpNext;
-      p.level++;
-      p.xpNext = Math.floor(4 + p.level * 5 + Math.pow(p.level, 1.5));
+  // La experiencia y el nivel son compartidos; el bonus de Sabiduría es el de quien recoge.
+  function gainXp(v, p) {
+    G.xp += v * p.stats.xp;
+    while (G.xp >= G.xpNext) {
+      G.xp -= G.xpNext;
+      G.level++;
+      G.xpNext = Math.floor((4 + G.level * 5 + Math.pow(G.level, 1.5)) * (G.coop ? 0.8 : 1));
       G.pending++;
     }
   }
 
-  function damagePlayer(d) {
-    const p = G.p;
-    if (p.inv > 0 || state !== 'play') return;
+  function damagePlayer(p, d) {
+    if (p.down || p.inv > 0 || state !== 'play') return;
     const dmg = Math.max(1, d - p.stats.armor);
     p.hp -= dmg; p.inv = 0.5;
     G.shake = Math.max(G.shake, 6);
     addText(p.x, p.y - 26, '-' + Math.round(dmg), '#ff5c6c');
     burst(p.x, p.y, '#ff5c6c', 8);
     Sound.play('hurt', 0.15);
-    if (p.hp <= 0) {
-      if (G.revives > 0) {
-        G.revives--;
-        p.hp = p.maxHp * 0.5; p.inv = 2.5;
-        query(p.x, p.y, 260, e => { if (!e.boss) hurt(e, 99999, 0, 0, 0, true); });
-        for (const b of G.ebullets) b.dead = true;
-        burst(p.x, p.y, '#fff7c2', 60, 320);
-        G.shake = 12;
-        Sound.play('revive');
-        toast('🕊️ ¡Renaces de tus cenizas!');
-      } else {
-        p.hp = 0;
-        endGame(false);
-      }
+    if (p.hp > 0) return;
+    if (p.revives > 0) {
+      p.revives--;
+      p.hp = p.maxHp * 0.5; p.inv = 2.5;
+      query(p.x, p.y, 260, e => { if (!e.boss) hurt(e, 99999, 0, 0, 0, true); });
+      for (const b of G.ebullets) b.dead = true;
+      burst(p.x, p.y, '#fff7c2', 60, 320);
+      G.shake = 12;
+      Sound.play('revive');
+      toast(`🕊️ ${ptag(p)}¡Renaces de tus cenizas!`);
+    } else if (G.coop && alive().length > 1) {
+      // En cooperativo, el jugador cae y su compañero puede reanimarlo.
+      p.hp = 0; p.down = true; p.reviveT = 0;
+      burst(p.x, p.y, p.color, 30, 200);
+      toast(`💀 ${pname(p)} ha caído. ¡Quédate a su lado para reanimarlo!`);
+    } else {
+      p.hp = 0; p.down = true;
+      endGame(false);
     }
   }
 
@@ -477,7 +548,7 @@
       for (let i = 0; i < n; i++) {
         const a = ev ? base + i / n * TAU : base + (i - (n - 1) / 2) * 0.35;
         G.bullets.push({
-          kind: 'disco', ev, x: p.x, y: p.y, vx: Math.cos(a), vy: Math.sin(a), spd: ev ? 520 : 440,
+          kind: 'disco', ev, owner: p, x: p.x, y: p.y, vx: Math.cos(a), vy: Math.sin(a), spd: ev ? 520 : 440,
           t: 0, out: 0.6, r, dmg, hits: new Map(), life: 5, rot: 0,
         });
       }
@@ -486,10 +557,10 @@
   };
 
   // ---------- Subida de nivel ----------
-  function buildOptions(count) {
-    const p = G.p, o = [];
+  function buildOptions(p, count) {
+    const o = [];
     for (const w of p.weapons) if (!w.evolved && w.lvl < WMAX) o.push({ k: 'w', id: w.id });
-    if (p.weapons.length < SLOTS) for (const id in WEAPONS) if (!hasWeapon(id)) o.push({ k: 'nw', id });
+    if (p.weapons.length < SLOTS) for (const id in WEAPONS) if (!hasWeapon(p, id)) o.push({ k: 'nw', id });
     const owned = Object.keys(p.passives);
     for (const id of owned) if (p.passives[id] < PASSIVES[id].max) o.push({ k: 'p', id });
     if (owned.length < SLOTS) for (const id in PASSIVES) if (!p.passives[id]) o.push({ k: 'np', id });
@@ -498,17 +569,17 @@
     return r;
   }
 
-  function describe(o) {
+  function describe(p, o) {
     if (o.k === 'heal') return { icon: '🍖', title: 'Festín', lvl: '', isNew: false, desc: 'Recupera 40 de vida.', hint: '' };
     if (o.k === 'w' || o.k === 'nw') {
-      const d = WEAPONS[o.id], w = hasWeapon(o.id), nl = w ? w.lvl + 1 : 1, ps = PASSIVES[d.evo];
+      const d = WEAPONS[o.id], w = hasWeapon(p, o.id), nl = w ? w.lvl + 1 : 1, ps = PASSIVES[d.evo];
       return {
         icon: d.icon, title: d.name, lvl: w ? `Nv. ${nl}` : '¡Nuevo!', isNew: !w,
         desc: w ? d.up[nl - 2] : d.desc,
         hint: nl === WMAX ? `Evoluciona con ${ps.icon} ${ps.name}` : '',
       };
     }
-    const d = PASSIVES[o.id], l = G.p.passives[o.id] || 0;
+    const d = PASSIVES[o.id], l = p.passives[o.id] || 0;
     const evoW = Object.keys(WEAPONS).find(k => WEAPONS[k].evo === o.id);
     return {
       icon: d.icon, title: d.name, lvl: l ? `Nv. ${l + 1}` : '¡Nuevo!', isNew: !l, desc: d.desc,
@@ -516,22 +587,33 @@
     };
   }
 
-  function applyOption(o) {
-    if (o.k === 'heal') heal(40);
-    else if (o.k === 'nw') addWeapon(o.id);
-    else if (o.k === 'w') hasWeapon(o.id).lvl++;
-    else addPassive(o.id);
+  function applyOption(p, o) {
+    if (o.k === 'heal') heal(p, 40);
+    else if (o.k === 'nw') addWeapon(p, o.id);
+    else if (o.k === 'w') hasWeapon(p, o.id).lvl++;
+    else addPassive(p, o.id);
+  }
+
+  // En cooperativo, las mejoras se reparten por turnos entre los jugadores en pie.
+  function levelChooser() {
+    let p = G.players[G.chooser % G.players.length];
+    if (p.down) p = G.players.find(q => !q.down) || p;
+    return p;
   }
 
   function openLevelUp() {
     state = 'levelup';
-    joy.active = false;
+    releaseJoys();
     Sound.play('level');
-    G.opts = buildOptions(G.choices);
+    const p = G.chooserP = levelChooser();
+    G.opts = buildOptions(p, G.choices);
+    const title = $('lvTitle');
+    if (G.coop) title.innerHTML = `¡Subes de nivel! <span style="color:${p.color}">Elige ${pname(p)} (${esc(p.ch.name)})</span>`;
+    else title.textContent = '¡Subes de nivel!';
     const box = $('choices');
     box.innerHTML = '';
     G.opts.forEach((o, i) => {
-      const d = describe(o);
+      const d = describe(p, o);
       const b = document.createElement('button');
       b.className = 'card';
       b.innerHTML =
@@ -550,23 +632,23 @@
   function choose(o) {
     if (state !== 'levelup') return;
     Sound.play('click');
-    applyOption(o);
+    applyOption(G.chooserP, o);
+    if (G.coop) G.chooser = (G.chooserP.idx + 1) % G.players.length;
     G.pending--;
     if (G.pending > 0) openLevelUp();
     else { state = 'play'; showOnly(null); }
   }
 
-  function openChest() {
-    const p = G.p;
+  function openChest(p) {
     const goldBonus = 10;
     G.gold += goldBonus;
-    const ev = p.weapons.find(canEvolve);
+    const ev = p.weapons.find(w => canEvolve(p, w));
     if (ev) {
       ev.evolved = true;
       G.shake = 8;
       burst(p.x, p.y, '#ffd75e', 40, 260);
       Sound.play('evolve');
-      toast(`¡EVOLUCIÓN! ${WEAPONS[ev.id].icon} ${WEAPONS[ev.id].evoName}`);
+      toast(`${ptag(p)}¡EVOLUCIÓN! ${WEAPONS[ev.id].icon} ${WEAPONS[ev.id].evoName}`);
       return;
     }
     Sound.play('chest');
@@ -574,25 +656,25 @@
     for (const w of p.weapons) if (!w.evolved && w.lvl < WMAX) ups.push({ k: 'w', id: w.id });
     for (const id in p.passives) if (p.passives[id] < PASSIVES[id].max) ups.push({ k: 'p', id });
     if (ups.length) {
-      const o = pick(ups), d = describe(o);
-      applyOption(o);
-      toast(`Cofre: ${d.icon} ${d.title} ${d.lvl} · +${goldBonus} 🪙`);
+      const o = pick(ups), d = describe(p, o);
+      applyOption(p, o);
+      toast(`${ptag(p)}Cofre: ${d.icon} ${d.title} ${d.lvl} · +${goldBonus} 🪙`);
     } else {
-      heal(50);
-      toast(`Cofre: +50 de vida · +${goldBonus} 🪙`);
+      heal(p, 50);
+      toast(`${ptag(p)}Cofre: +50 de vida · +${goldBonus} 🪙`);
     }
   }
 
   // ---------- Aparición de enemigos ----------
   function spawnPos() {
     const a = rand(0, TAU), d = Math.hypot(VW, VH) / 2 + rand(40, 120);
-    return [G.p.x + Math.cos(a) * d, G.p.y + Math.sin(a) * d];
+    return [G.cx + Math.cos(a) * d, G.cy + Math.sin(a) * d];
   }
 
   function spawnEnemy(type, m = {}) {
     const t = ETYPES[type], map = G.map;
     const [x, y] = m.pos || spawnPos();
-    const hs = (1 + G.time / 60 * 0.45) * map.hp;
+    const hs = (1 + G.time / 60 * 0.45) * map.hp * G.diffHp;
     const e = {
       x, y, type, r: t.r * (m.size || 1), hp: t.hp * hs * (m.hp || 1), speed: t.speed * map.speed * (m.speed || 1),
       dmg: t.dmg * (m.dmg || 1), xp: t.xp * (m.xp || 1), color: map.colors[type],
@@ -605,7 +687,7 @@
 
   function spawnBoss(b) {
     const [x, y] = spawnPos();
-    const hp = b.hp * G.map.hp;
+    const hp = b.hp * G.map.hp * G.diffBoss;
     const e = {
       x, y, type: 'boss', r: b.r, hp, maxHp: hp, speed: b.speed * G.map.speed, dmg: b.dmg, xp: 60, color: b.color,
       flash: 0, kx: 0, ky: 0, slow: 0, boss: true, final: b.final, name: b.name, shots: b.shots,
@@ -622,7 +704,7 @@
     const t = G.time;
     if (G.bossIdx < BOSSES.length && t >= BOSSES[G.bossIdx].at) spawnBoss(BOSSES[G.bossIdx++]);
 
-    const rate = Math.min(1.2 + t / 22, 30) * (G.boss ? 0.5 : 1);
+    const rate = Math.min(1.2 + t / 22, 30) * (G.boss ? 0.5 : 1) * G.diffRate;
     G.spawnAcc += rate * dt;
     const pool =
       t < 40 ? ['slime'] :
@@ -646,39 +728,68 @@
       const d = Math.hypot(VW, VH) / 2 + 40;
       for (let i = 0; i < n && G.enemies.length < MAX_ENEMIES; i++) {
         const a = i / n * TAU;
-        spawnEnemy(type, { pos: [G.p.x + Math.cos(a) * d, G.p.y + Math.sin(a) * d] });
+        spawnEnemy(type, { pos: [G.cx + Math.cos(a) * d, G.cy + Math.sin(a) * d] });
       }
     }
   }
 
   // ---------- Actualización ----------
-  function updatePlayer(dt) {
-    const p = G.p;
-    const { dx, dy } = inputDir();
-    const sp = 170 * p.stats.speed;
-    p.x += dx * sp * dt; p.y += dy * sp * dt;
-    if (dx || dy) {
-      const l = Math.hypot(dx, dy);
-      p.face = { x: dx / l, y: dy / l };
-      if (Math.abs(dx) > 0.1) p.side = Math.sign(dx);
-      p.walk += dt * 10;
+  const REVIVE_TIME = 3;
+  function updatePlayers(dt) {
+    const both = G.coop && alive().length === 2;
+    // Los dos jugadores deben caber en pantalla: nadie puede alejarse del centro más que esto.
+    const hw = VW / 2 - 40, hh = VH / 2 - 50;
+    for (const p of G.players) {
+      if (p.down) {
+        const helper = G.players.find(q => q !== p && !q.down && dist2(q.x, q.y, p.x, p.y) < 55 * 55);
+        if (helper) {
+          p.reviveT += dt;
+          if (p.reviveT >= REVIVE_TIME) {
+            p.down = false; p.reviveT = 0; p.hp = p.maxHp * 0.4; p.inv = 2;
+            burst(p.x, p.y, '#b6ffcf', 40, 260);
+            Sound.play('revive');
+            toast(`💚 ${pname(helper)} ha reanimado a ${pname(p)}`);
+          }
+        } else p.reviveT = Math.max(0, p.reviveT - dt * 0.5);
+        continue;
+      }
+      const { dx, dy } = inputDir(p.idx);
+      const sp = 170 * p.stats.speed;
+      p.x += dx * sp * dt; p.y += dy * sp * dt;
+      if (both) {
+        p.x = Math.max(G.cx - hw, Math.min(G.cx + hw, p.x));
+        p.y = Math.max(G.cy - hh, Math.min(G.cy + hh, p.y));
+      }
+      if (dx || dy) {
+        const l = Math.hypot(dx, dy);
+        p.face = { x: dx / l, y: dy / l };
+        if (Math.abs(dx) > 0.1) p.side = Math.sign(dx);
+        p.walk += dt * 10;
+      }
+      p.inv -= dt;
+      if (p.stats.regen) p.hp = Math.min(p.maxHp, p.hp + p.stats.regen * dt);
     }
-    p.inv -= dt;
-    if (p.stats.regen) p.hp = Math.min(p.maxHp, p.hp + p.stats.regen * dt);
+    // La cámara sigue el punto medio de los jugadores en pie.
+    const al = alive();
+    if (al.length) {
+      G.cx = al.reduce((a, p) => a + p.x, 0) / al.length;
+      G.cy = al.reduce((a, p) => a + p.y, 0) / al.length;
+    }
   }
 
   function updateEnemies(dt) {
-    const p = G.p, far = Math.hypot(VW, VH) * 0.9 + 200;
+    const far = Math.hypot(VW, VH) * 0.9 + 200;
     const damp = Math.min(1, dt * 10);
     for (const e of G.enemies) {
       if (e.dead) continue;
-      const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1;
-      if (!e.boss && !e.elite && d > far) {
-        // Reubica enemigos que quedaron muy atrás delante del jugador.
-        const a = Math.atan2(dy, dx), nd = Math.hypot(VW, VH) / 2 + 60;
-        e.x = p.x + Math.cos(a) * nd; e.y = p.y + Math.sin(a) * nd;
+      if (!e.boss && !e.elite && dist2(e.x, e.y, G.cx, G.cy) > far * far) {
+        // Reubica enemigos que quedaron muy atrás delante de los jugadores.
+        const a = Math.atan2(G.cy - e.y, G.cx - e.x), nd = Math.hypot(VW, VH) / 2 + 60;
+        e.x = G.cx + Math.cos(a) * nd; e.y = G.cy + Math.sin(a) * nd;
         continue;
       }
+      const tg = nearestPlayer(e.x, e.y) || G.players[0];
+      const dx = tg.x - e.x, dy = tg.y - e.y, d = Math.hypot(dx, dy) || 1;
       const sp = e.speed * (e.slow > 0 ? 0.5 : 1);
       e.slow -= dt; e.flash -= dt; e.wob += dt * 6;
       e.x += (dx / d * sp + e.kx) * dt;
@@ -693,7 +804,9 @@
           if (ov > 0) { const push = (o.boss ? ov : ov * 0.5) * 0.5; e.x += sx / sd * push; e.y += sy / sd * push; }
         });
       }
-      if (d < e.r + p.r) damagePlayer(e.dmg);
+      for (const p of G.players) {
+        if (!p.down && dist2(e.x, e.y, p.x, p.y) < (e.r + p.r) ** 2) damagePlayer(p, e.dmg);
+      }
       if (e.boss) bossAI(e, dt);
     }
   }
@@ -707,8 +820,9 @@
       const a = i / e.shots * TAU + e.phase;
       G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160, r: 7, dmg: 12, life: 5, color: e.color });
     }
-    if (e.final) {
-      const a = Math.atan2(G.p.y - e.y, G.p.x - e.x);
+    const tg = nearestPlayer(e.x, e.y);
+    if (e.final && tg) {
+      const a = Math.atan2(tg.y - e.y, tg.x - e.x);
       for (let i = -1; i <= 1; i++) {
         G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(a + i * 0.15) * 230, vy: Math.sin(a + i * 0.15) * 230, r: 8, dmg: 15, life: 4, color: '#ffd75e' });
       }
@@ -716,7 +830,6 @@
   }
 
   function updateBullets(dt) {
-    const p = G.p;
     for (const b of G.bullets) {
       b.life -= dt;
       if (b.life <= 0) { b.dead = true; continue; }
@@ -730,6 +843,7 @@
           if (--b.pierce < 0) b.dead = true;
         });
       } else if (b.kind === 'disco') {
+        const p = b.owner;
         b.t += dt; b.rot += dt * 18;
         if (b.t < b.out) {
           const sp = b.spd * (1 - b.t / b.out) + 40;
@@ -751,45 +865,51 @@
   }
 
   function updateEBullets(dt) {
-    const p = G.p;
     for (const b of G.ebullets) {
       b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
-      if (b.life <= 0) b.dead = true;
-      else if (dist2(b.x, b.y, p.x, p.y) < (b.r + p.r) ** 2) { damagePlayer(b.dmg); b.dead = true; }
+      if (b.life <= 0) { b.dead = true; continue; }
+      for (const p of G.players) {
+        if (!p.down && dist2(b.x, b.y, p.x, p.y) < (b.r + p.r) ** 2) { damagePlayer(p, b.dmg); b.dead = true; break; }
+      }
     }
   }
 
-  function attract(g, dt, p, mr2) {
-    if (!g.mag && dist2(g.x, g.y, p.x, p.y) < mr2) g.mag = true;
-    if (!g.mag) return Infinity;
+  // Atrae un objeto hacia el jugador en pie más cercano (según su radio de recogida).
+  function attract(g, dt) {
+    const p = nearestPlayer(g.x, g.y);
+    if (!p) return;
+    const mr = 80 * p.stats.magnet;
+    if (!g.mag && dist2(g.x, g.y, p.x, p.y) < mr * mr) g.mag = true;
+    if (!g.mag) return;
     const dx = p.x - g.x, dy = p.y - g.y, d = Math.hypot(dx, dy) || 1;
     g.sp += 1100 * dt;
     const step = Math.min(d, (180 + g.sp) * dt);
     g.x += dx / d * step; g.y += dy / d * step;
-    return d;
   }
+  const touching = (k, reach) => G.players.find(p => !p.down && dist2(k.x, k.y, p.x, p.y) < (p.r + reach) ** 2);
 
   function updateGems(dt) {
-    const p = G.p, mr = 80 * p.stats.magnet, mr2 = mr * mr;
     for (const g of G.gems) {
-      if (attract(g, dt, p, mr2) < p.r + 6) { g.dead = true; gainXp(g.v); Sound.play('gem', 0.035); }
+      attract(g, dt);
+      const p = touching(g, 6);
+      if (p) { g.dead = true; gainXp(g.v, p); Sound.play('gem', 0.035); }
     }
   }
 
   function updatePickups(dt) {
-    const p = G.p, mr = 80 * p.stats.magnet, mr2 = mr * mr;
     for (const k of G.pickups) {
       k.t += dt;
-      if (k.type === 'moneda') attract(k, dt, p, mr2);
-      if (dist2(k.x, k.y, p.x, p.y) > (p.r + 16) ** 2) continue;
+      if (k.type === 'moneda') attract(k, dt);
+      const p = touching(k, 16);
+      if (!p) continue;
       k.dead = true;
-      if (k.type === 'carne') { heal(30); Sound.play('coin'); }
+      if (k.type === 'carne') { heal(p, 30); Sound.play('coin'); }
       else if (k.type === 'iman') {
         for (const g of G.gems) g.mag = true;
         for (const c of G.pickups) if (c.type === 'moneda') c.mag = true;
         Sound.play('chest');
         toast('🧲 ¡Todos los cristales vienen a ti!');
-      } else if (k.type === 'cofre') openChest();
+      } else if (k.type === 'cofre') openChest(p);
       else if (k.type === 'moneda') { G.gold += k.v; G.coins--; Sound.play('coin', 0.05); }
     }
   }
@@ -807,11 +927,13 @@
   function update(dt) {
     G.time += dt;
     buildGrid();
-    updatePlayer(dt);
+    updatePlayers(dt);
     spawner(dt);
     updateEnemies(dt);
     buildGrid();
-    for (const w of G.p.weapons) W_UPDATE[w.id](w, dt, G.p, G.p.stats);
+    for (const p of G.players) {
+      if (!p.down) for (const w of p.weapons) W_UPDATE[w.id](w, dt, p, p.stats);
+    }
     updateBullets(dt);
     updateEBullets(dt);
     updateGems(dt);
@@ -905,7 +1027,7 @@
     shadow(e.x, e.y, e.r);
     const c = e.flash > 0 ? '#ffffff' : e.color;
     const r = e.r;
-    const look = e.x > G.p.x ? -r * 0.25 : r * 0.25;
+    const look = e.x > G.cx ? -r * 0.25 : r * 0.25;
     ctx.save();
     ctx.translate(e.x, e.y);
     ctx.fillStyle = c;
@@ -1022,22 +1144,47 @@
     eyes(x + face.x * r * 0.35, cy + 1 + face.y * 3, r * 0.25);
   }
 
-  function drawPlayer() {
-    const p = G.p;
-    if (p.inv > 0 && Math.floor(p.inv * 20) % 2 === 0) ctx.globalAlpha = 0.45;
-    shadow(p.x, p.y, p.r);
-    drawHero(p.x, p.y, p.r, p.ch, { x: p.face.x, y: p.face.y, side: p.side }, Math.sin(p.walk) * 1.5);
-    ctx.globalAlpha = 1;
-    const bw = 36;
-    ctx.fillStyle = '#2a0d18'; ctx.fillRect(p.x - bw / 2, p.y + p.r + 8, bw, 5);
-    ctx.fillStyle = p.hp / p.maxHp > 0.3 ? '#4dff88' : '#ff4d6a';
-    ctx.fillRect(p.x - bw / 2, p.y + p.r + 8, bw * p.hp / p.maxHp, 5);
+  function drawPlayers() {
+    for (const p of G.players) {
+      const bob = Math.sin(p.walk) * 1.5, face = { x: p.face.x, y: p.face.y, side: p.side };
+      if (p.down) {
+        // Jugador caído: fantasma con el anillo de reanimación.
+        ctx.globalAlpha = 0.4;
+        drawHero(p.x, p.y, p.r, p.ch, face, 0, false);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 12, 0, TAU); ctx.stroke();
+        if (p.reviveT > 0) {
+          ctx.strokeStyle = '#6fffb0';
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 12, -Math.PI / 2, -Math.PI / 2 + TAU * Math.min(1, p.reviveT / REVIVE_TIME)); ctx.stroke();
+        }
+        ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fff';
+        ctx.fillText('💀 ' + pname(p), p.x, p.y - p.r - 22);
+        continue;
+      }
+      if (p.inv > 0 && Math.floor(p.inv * 20) % 2 === 0) ctx.globalAlpha = 0.45;
+      shadow(p.x, p.y, p.r);
+      drawHero(p.x, p.y, p.r, p.ch, face, bob);
+      ctx.globalAlpha = 1;
+      const bw = 36;
+      ctx.fillStyle = '#2a0d18'; ctx.fillRect(p.x - bw / 2, p.y + p.r + 8, bw, 5);
+      ctx.fillStyle = p.hp / p.maxHp > 0.3 ? '#4dff88' : '#ff4d6a';
+      ctx.fillRect(p.x - bw / 2, p.y + p.r + 8, bw * p.hp / p.maxHp, 5);
+      if (G.coop) {
+        ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)';
+        ctx.strokeText(pname(p), p.x, p.y - p.r - 16);
+        ctx.fillStyle = p.color; ctx.fillText(pname(p), p.x, p.y - p.r - 16);
+      }
+    }
   }
 
   function drawWeaponsWorld() {
-    const p = G.p;
-    for (const w of p.weapons) {
-      if (w.id === 'halo' && w.R) {
+    for (const p of G.players) {
+      if (p.down) continue;
+      for (const w of p.weapons) {
+        if (w.id !== 'halo' || !w.R) continue;
         const pulse = 0.5 + Math.sin(G.time * 6) * 0.15;
         const g = ctx.createRadialGradient(p.x, p.y, w.R * 0.2, p.x, p.y, w.R);
         g.addColorStop(0, 'rgba(255,120,40,0)');
@@ -1051,20 +1198,22 @@
   }
 
   function drawOrbs() {
-    const p = G.p;
-    for (const w of p.weapons) {
-      if (w.id !== 'orbe' || !w.n) continue;
-      for (let i = 0; i < w.n; i++) {
-        const a = w.angle + i / w.n * TAU;
-        const x = p.x + Math.cos(a) * w.R, y = p.y + Math.sin(a) * w.R;
-        ctx.save();
-        ctx.translate(x, y); ctx.rotate(a + Math.PI / 2);
-        ctx.shadowColor = w.evolved ? '#ff5edc' : '#9dfcff'; ctx.shadowBlur = 12;
-        ctx.fillStyle = w.evolved ? '#ffb3f0' : '#d9fdff';
-        ctx.beginPath();
-        ctx.moveTo(0, -w.br * 1.4); ctx.quadraticCurveTo(w.br, 0, 0, w.br * 1.4); ctx.quadraticCurveTo(-w.br * 0.3, 0, 0, -w.br * 1.4);
-        ctx.fill();
-        ctx.restore();
+    for (const p of G.players) {
+      if (p.down) continue;
+      for (const w of p.weapons) {
+        if (w.id !== 'orbe' || !w.n) continue;
+        for (let i = 0; i < w.n; i++) {
+          const a = w.angle + i / w.n * TAU;
+          const x = p.x + Math.cos(a) * w.R, y = p.y + Math.sin(a) * w.R;
+          ctx.save();
+          ctx.translate(x, y); ctx.rotate(a + Math.PI / 2);
+          ctx.shadowColor = w.evolved ? '#ff5edc' : '#9dfcff'; ctx.shadowBlur = 12;
+          ctx.fillStyle = w.evolved ? '#ffb3f0' : '#d9fdff';
+          ctx.beginPath();
+          ctx.moveTo(0, -w.br * 1.4); ctx.quadraticCurveTo(w.br, 0, 0, w.br * 1.4); ctx.quadraticCurveTo(-w.br * 0.3, 0, 0, -w.br * 1.4);
+          ctx.fill();
+          ctx.restore();
+        }
       }
     }
   }
@@ -1171,24 +1320,24 @@
   }
 
   function drawHUD() {
-    const p = G.p, st = SAFE.t, sl = SAFE.l, sb = SAFE.b;
+    const st = SAFE.t, sl = SAFE.l, sr = SAFE.r, sb = SAFE.b;
     const small = W < 420;
-    // Barra de experiencia
+    // Barra de experiencia (compartida)
     ctx.fillStyle = '#161a36'; ctx.fillRect(0, 0, W, st + 8);
     const xg = ctx.createLinearGradient(0, 0, W, 0);
     xg.addColorStop(0, '#4b6cff'); xg.addColorStop(1, '#5ad1ff');
-    ctx.fillStyle = xg; ctx.fillRect(0, st, W * Math.min(1, p.xp / p.xpNext), 8);
+    ctx.fillStyle = xg; ctx.fillRect(0, st, W * Math.min(1, G.xp / G.xpNext), 8);
 
     // Tiempo, muertes y oro
     ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
     ctx.fillStyle = '#fff'; ctx.font = `bold ${small ? 20 : 24}px system-ui`;
     ctx.fillText(fmtTime(G.time), W / 2, st + 36);
     ctx.font = `${small ? 12 : 13}px system-ui`; ctx.fillStyle = '#b9bee6';
-    ctx.fillText(`☠ ${p.kills}   🪙 ${G.gold}`, W / 2, st + 54);
+    ctx.fillText(`☠ ${G.kills}   🪙 ${G.gold}`, W / 2, st + 54);
 
-    // Nivel e inventario
+    // Nivel e inventario: J1 a la izquierda, J2 a la derecha (bajo el botón de pausa)
     ctx.textAlign = 'left'; ctx.font = `bold ${small ? 14 : 15}px system-ui`; ctx.fillStyle = '#ffd75e';
-    ctx.fillText(`Nv. ${p.level}`, sl + 10, st + 28);
+    ctx.fillText(`Nv. ${G.level}`, sl + 10, st + 28);
     const sz = small ? 22 : 26, gap = sz + 4, fs = small ? 13 : 16;
     const slot = (x, y, icon, label, bg) => {
       ctx.fillStyle = bg; rr(x, y, sz, sz, 6); ctx.fill();
@@ -1197,11 +1346,40 @@
       ctx.font = 'bold 9px system-ui'; ctx.fillStyle = '#fff';
       ctx.fillText(label, x + sz - 4, y + sz - 4);
     };
-    p.weapons.forEach((w, i) => slot(sl + 10 + i * gap, st + 36, WEAPONS[w.id].icon, w.evolved ? '★' : w.lvl, w.evolved ? 'rgba(255,215,94,.35)' : 'rgba(40,46,100,.7)'));
-    Object.keys(p.passives).forEach((id, i) => slot(sl + 10 + i * gap, st + 36 + gap, PASSIVES[id].icon, p.passives[id], 'rgba(40,46,100,.5)'));
-    if (G.revives > 0) {
-      ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.font = `${fs}px system-ui`;
-      ctx.fillText('🕊️', sl + 10, st + 36 + gap * 2 + sz / 2);
+    for (const p of G.players) {
+      const right = p.idx === 1;
+      const y0 = right ? st + 70 : st + 36;
+      const xAt = i => right ? W - sr - 10 - sz - i * gap : sl + 10 + i * gap;
+      ctx.globalAlpha = p.down ? 0.4 : 1;
+      if (G.coop) {
+        ctx.fillStyle = p.color;
+        ctx.fillRect(right ? W - sr - 6 : sl + 4, y0, 3, gap * 2 - 4);
+      }
+      p.weapons.forEach((w, i) => slot(xAt(i), y0, WEAPONS[w.id].icon, w.evolved ? '★' : w.lvl, w.evolved ? 'rgba(255,215,94,.35)' : 'rgba(40,46,100,.7)'));
+      Object.keys(p.passives).forEach((id, i) => slot(xAt(i), y0 + gap, PASSIVES[id].icon, p.passives[id], 'rgba(40,46,100,.5)'));
+      if (p.revives > 0) {
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `${fs}px system-ui`;
+        ctx.fillText('🕊️', xAt(0) + sz / 2, y0 + gap * 2 + sz / 2);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Indicador de un compañero caído fuera de la pantalla
+    for (const p of G.players) {
+      if (!p.down || inView(p.x, p.y, -20)) continue;
+      const sx = (p.x - camX) * ZOOM, sy = (p.y - camY) * ZOOM;
+      const m = 34, x = Math.max(m, Math.min(W - m, sx)), y = Math.max(st + 90, Math.min(H - sb - 60, sy));
+      const a = Math.atan2(sy - y, sx - x);
+      ctx.fillStyle = 'rgba(10,12,30,.8)'; ctx.strokeStyle = p.color; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 18, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos(a) * 28, y + Math.sin(a) * 28);
+      ctx.lineTo(x + Math.cos(a + 0.4) * 19, y + Math.sin(a + 0.4) * 19);
+      ctx.lineTo(x + Math.cos(a - 0.4) * 19, y + Math.sin(a - 0.4) * 19);
+      ctx.fill();
+      ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('💀' + pname(p), x, y);
     }
 
     // Barra del jefe
@@ -1213,18 +1391,31 @@
       ctx.fillText(b.name, W / 2, y - 8);
     }
 
-    // Joystick táctil
-    if (joy.active && state === 'play') {
-      const jx = joy.x - joy.ox, jy = joy.y - joy.oy, l = Math.hypot(jx, jy), m = Math.min(l, JR);
-      ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 2;
-      ctx.fillStyle = 'rgba(255,255,255,.06)';
-      ctx.beginPath(); ctx.arc(joy.ox, joy.oy, JR, 0, TAU); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = 'rgba(255,255,255,.35)';
-      ctx.beginPath(); ctx.arc(joy.ox + (l ? jx / l * m : 0), joy.oy + (l ? jy / l * m : 0), JR * 0.4, 0, TAU); ctx.fill();
+    // Joysticks táctiles
+    if (state === 'play') {
+      joys.forEach((j, i) => {
+        if (!j.active) return;
+        const jx = j.x - j.ox, jy = j.y - j.oy, l = Math.hypot(jx, jy), m = Math.min(l, JR);
+        ctx.strokeStyle = G.coop ? PCOLORS[i] : 'rgba(255,255,255,.25)'; ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(255,255,255,.06)';
+        ctx.beginPath(); ctx.arc(j.ox, j.oy, JR, 0, TAU); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,.35)';
+        ctx.beginPath(); ctx.arc(j.ox + (l ? jx / l * m : 0), j.oy + (l ? jy / l * m : 0), JR * 0.4, 0, TAU); ctx.fill();
+      });
+      // Línea divisoria táctil en cooperativo
+      if (G.coop && isTouch && G.time < 6) {
+        ctx.strokeStyle = 'rgba(255,255,255,.15)'; ctx.setLineDash([6, 8]); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(W / 2, st + 70); ctx.lineTo(W / 2, H - sb - 50); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = 'bold 14px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = PCOLORS[0]; ctx.fillText('J1', W / 4, H - sb - 70);
+        ctx.fillStyle = PCOLORS[1]; ctx.fillText('J2', W * 3 / 4, H - sb - 70);
+      }
     }
 
-    // Viñeta roja con poca vida
-    const hpk = p.hp / p.maxHp;
+    // Viñeta roja con poca vida (del jugador en pie más herido)
+    const al = alive();
+    const hpk = al.length ? Math.min(...al.map(p => p.hp / p.maxHp)) : 0;
     if (hpk < 0.3) {
       const v = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.7);
       v.addColorStop(0, 'rgba(255,0,40,0)');
@@ -1251,9 +1442,8 @@
     if (!G) { renderMenuBg(dt); return; }
     ctx.fillStyle = G.map.bg;
     ctx.fillRect(0, 0, W, H);
-    const p = G.p;
     const sx = G.shake > 0 ? rand(-G.shake, G.shake) : 0, sy = G.shake > 0 ? rand(-G.shake, G.shake) : 0;
-    camX = p.x - VW / 2 + sx; camY = p.y - VH / 2 + sy;
+    camX = G.cx - VW / 2 + sx; camY = G.cy - VH / 2 + sy;
     ctx.save();
     ctx.scale(ZOOM, ZOOM);
     ctx.translate(-camX, -camY);
@@ -1262,7 +1452,7 @@
     drawGems();
     drawPickups();
     for (const e of G.enemies) if (inView(e.x, e.y, e.r * 2 + 20)) drawEnemy(e);
-    drawPlayer();
+    drawPlayers();
     drawOrbs();
     drawBullets();
     drawEffects();
@@ -1306,14 +1496,14 @@
 
   function bump(el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); Sound.play('error'); }
 
-  function renderSelect() {
-    refreshGold();
-    const cbox = $('chars');
+  // Rejilla de personajes para un jugador ('char' = J1, 'char2' = J2).
+  function renderCharGrid(boxId, slotKey) {
+    const cbox = $(boxId);
     cbox.innerHTML = '';
     for (const ch of CHARS) {
       const owned = S.chars.includes(ch.id);
       const b = document.createElement('button');
-      b.className = 'sel' + (S.char === ch.id ? ' on' : '') + (owned ? '' : ' locked');
+      b.className = 'sel' + (S[slotKey] === ch.id ? ' on' : '') + (owned ? '' : ' locked');
       b.appendChild(portrait(ch));
       const w = WEAPONS[ch.weapon];
       b.insertAdjacentHTML('beforeend',
@@ -1326,10 +1516,20 @@
           S.gold -= ch.cost; S.chars.push(ch.id);
           Sound.play('buy');
         } else Sound.play('click');
-        S.char = ch.id; save(); renderSelect();
+        S[slotKey] = ch.id; save(); renderSelect();
       });
       cbox.appendChild(b);
     }
+  }
+
+  function renderSelect() {
+    refreshGold();
+    document.querySelectorAll('#modeRow button').forEach(b => b.classList.toggle('on', (b.dataset.m === '2') === !!S.coop));
+    $('p1Title').textContent = S.coop ? 'Jugador 1' : 'Elige personaje';
+    $('p1Title').classList.toggle('p1', !!S.coop);
+    $('p2Wrap').classList.toggle('hidden', !S.coop);
+    renderCharGrid('chars', 'char');
+    if (S.coop) renderCharGrid('chars2', 'char2');
     const mbox = $('maps');
     mbox.innerHTML = '';
     for (const m of MAPS) {
@@ -1485,7 +1685,8 @@
     $('toast').classList.add('hidden');
     state = 'play';
     Sound.startMusic();
-    if (isTouch) toast('Arrastra el dedo para moverte');
+    if (G.coop) toast(isTouch ? 'J1: mitad izquierda · J2: mitad derecha' : 'J1: WASD · J2: flechas (o un mando cada uno)');
+    else if (isTouch) toast('Arrastra el dedo para moverte');
   }
 
   function toMenu() {
@@ -1499,7 +1700,7 @@
   function togglePause() {
     if (state === 'play') {
       state = 'paused';
-      joy.active = false;
+      releaseJoys();
       renderBuild(); syncToggles();
       showOnly('pause');
       Sound.suspend();
@@ -1511,19 +1712,17 @@
   }
 
   function renderBuild() {
-    const p = G.p;
-    let h = `<div class="row">🗺️ ${G.map.name} · ${p.ch.name}</div>` +
-      `<div class="row">⏱ ${fmtTime(G.time)} · Nv. ${p.level} · ☠ ${p.kills} · 🪙 ${G.gold} · ❤ ${Math.ceil(p.hp)}/${p.maxHp}</div><h3>Armas</h3>`;
-    for (const w of p.weapons) {
-      const d = WEAPONS[w.id];
-      h += w.evolved
-        ? `<div class="row evo">${d.icon} ${d.evoName} ★</div>`
-        : `<div class="row">${d.icon} ${d.name} — Nv. ${w.lvl}${w.lvl >= WMAX ? ` (evoluciona con ${PASSIVES[d.evo].icon})` : ''}</div>`;
-    }
-    const ps = Object.keys(p.passives);
-    if (ps.length) {
-      h += '<h3>Objetos</h3>';
-      for (const id of ps) h += `<div class="row">${PASSIVES[id].icon} ${PASSIVES[id].name} — Nv. ${p.passives[id]}</div>`;
+    let h = `<div class="row">🗺️ ${G.map.name}${G.coop ? ' · 👥 Cooperativo' : ''}</div>` +
+      `<div class="row">⏱ ${fmtTime(G.time)} · Nv. ${G.level} · ☠ ${G.kills} · 🪙 ${G.gold}</div>`;
+    for (const p of G.players) {
+      h += `<h3 style="color:${G.coop ? p.color : ''}">${G.coop ? pname(p) + ' · ' : ''}${esc(p.ch.name)} · ❤ ${Math.ceil(p.hp)}/${p.maxHp}${p.down ? ' · 💀 caído' : ''}</h3>`;
+      for (const w of p.weapons) {
+        const d = WEAPONS[w.id];
+        h += w.evolved
+          ? `<div class="row evo">${d.icon} ${d.evoName} ★</div>`
+          : `<div class="row">${d.icon} ${d.name} — Nv. ${w.lvl}${w.lvl >= WMAX ? ` (evoluciona con ${PASSIVES[d.evo].icon})` : ''}</div>`;
+      }
+      for (const id of Object.keys(p.passives)) h += `<div class="row">${PASSIVES[id].icon} ${PASSIVES[id].name} — Nv. ${p.passives[id]}</div>`;
     }
     $('build').innerHTML = h;
   }
@@ -1531,7 +1730,7 @@
   function endGame(win) {
     if (state === 'over' || state === 'win') return;
     state = win ? 'win' : 'over';
-    joy.active = false;
+    releaseJoys();
     Sound.stopMusic();
     Sound.play(win ? 'win' : 'lose');
     const t = G.time, map = G.map;
@@ -1540,16 +1739,17 @@
     if (t > (S.best[map.id] || 0)) { S.best[map.id] = t; record = true; }
     if (win) S.wins[map.id] = (S.wins[map.id] || 0) + 1;
     const base = G.gold + Math.floor(t / 10) + G.bossKills * 50 + (win ? 150 : 0);
-    const earned = Math.round(base * map.gold * G.p.stats.gold);
+    const earned = Math.round(base * map.gold * G.players[0].stats.gold);
     S.gold += earned;
     save();
     const newMaps = MAPS.filter(m => lockedBefore.includes(m.id) && mapUnlocked(m));
 
-    $('endTitle').textContent = win ? '¡Victoria!' : 'Has caído';
+    $('endTitle').textContent = win ? '¡Victoria!' : (G.coop ? 'Habéis caído' : 'Has caído');
     $('endTitle').style.color = win ? '#6fffb0' : '#ff5c7a';
     $('endStats').innerHTML =
       (win ? 'El Rey del Abismo ha sido derrotado.<br>' : '') +
-      `Tiempo: <b>${fmtTime(t)}</b>${record ? ' 🏆' : ''}<br>Nivel: <b>${G.p.level}</b> · Enemigos: <b>${G.p.kills}</b><br>` +
+      (G.coop ? '👥 Cooperativo: ' + G.players.map(p => esc(p.ch.name)).join(' y ') + '<br>' : '') +
+      `Tiempo: <b>${fmtTime(t)}</b>${record ? ' 🏆' : ''}<br>Nivel: <b>${G.level}</b> · Enemigos: <b>${G.kills}</b><br>` +
       `Oro ganado: <b>🪙 ${earned}</b> (total ${S.gold})` +
       newMaps.map(m => `<br><span class="unlock">¡Nuevo mapa desbloqueado: ${m.emoji} ${m.name}!</span>`).join('');
     $('pauseBtn').classList.add('hidden');
@@ -1561,6 +1761,10 @@
   click('playBtn', () => { renderSelect(); showOnly('select'); });
   click('shopBtn', () => { renderShop(); showOnly('shop'); });
   click('helpBtn', () => showOnly('help'));
+  document.querySelectorAll('#modeRow button').forEach(b => b.addEventListener('click', () => {
+    Sound.init(); Sound.play('click');
+    S.coop = b.dataset.m === '2'; save(); renderSelect();
+  }));
   click('accountBtn', () => { setMsg(''); renderAccount(); showOnly('account'); });
   click('startBtn', start);
   click('retryBtn', start);
@@ -1582,6 +1786,7 @@
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
+    pollPads();
     if (state === 'play') update(dt);
     render(dt);
     requestAnimationFrame(frame);

@@ -200,3 +200,12 @@ button.google:hover { background: #eef0ff; }
 .backup summary { cursor: pointer; font-weight: 700; color: #c7cbf0; }
 .backup .sub { font-size: 13px; margin: 8px 0; }
 .backup button { width: 100%; margin: 4px 0 8px; }
+
+/* ---------- Cooperativo ---------- */
+.seg { display: inline-flex; gap: 4px; padding: 4px; margin: 0 0 12px; background: #12162f; border: 1px solid #2d3470; border-radius: 14px; flex-wrap: wrap; justify-content: center; }
+.seg button { margin: 0; background: transparent; border: none; min-height: 40px; padding: 8px 16px; }
+.seg button.on { background: linear-gradient(135deg, #4b6cff, #a24bff); }
+h2.p1, b.p1 { color: #4de1ff; }
+h2.p2, b.p2 { color: #ff6fb5; }
+.coophint { font-size: 13px; line-height: 1.6; }
+#p2Wrap .sel.on { border-color: #ff6fb5; box-shadow: 0 0 0 2px rgba(255, 111, 181, .25); }

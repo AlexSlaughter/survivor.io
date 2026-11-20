@@ -51,7 +51,8 @@
         <li>✨ Tus armas atacan solas. Recoge cristales para subir de nivel y elige mejoras.</li>
         <li>⭐ Lleva un arma a <b>Nv. 5</b>, consigue su objeto clave y abre un <b>cofre</b> (lo sueltan élites y jefes) para <b>evolucionarla</b>.</li>
         <li>🪙 Gana oro en cada partida y gástalo en la <b>tienda</b>, en nuevos <b>personajes</b> y desbloquea <b>mapas</b> más difíciles.</li>
-        <li>⏸ <b>P</b> / <b>Esc</b> para pausar. Teclas <b>1-4</b> para elegir mejoras.</li>
+        <li>👥 <b>Cooperativo local</b>: J1 juega con WASD y J2 con las flechas, con un mando cada uno, o en una pantalla táctil (mitad izquierda J1, mitad derecha J2). Compartís nivel y oro, cada uno mejora sus propias armas por turnos y podéis reanimaros.</li>
+        <li>⏸ <b>P</b> / <b>Esc</b> / <b>Start</b> para pausar. Teclas <b>1-4</b> (o A/B/X/Y en el mando) para elegir mejoras.</li>
       </ul>
       <button class="back">Volver</button>
     </div>
@@ -98,8 +99,17 @@
   <div id="select" class="overlay hidden">
     <div class="panel wide">
       <div class="topbar"><span class="gold">🪙 <b class="goldAmt">0</b></span></div>
-      <h2>Elige personaje</h2>
+      <div id="modeRow" class="seg">
+        <button data-m="1">👤 1 jugador</button>
+        <button data-m="2">👥 2 jugadores (local)</button>
+      </div>
+      <h2 id="p1Title">Elige personaje</h2>
       <div id="chars" class="grid"></div>
+      <div id="p2Wrap" class="hidden">
+        <h2 class="p2">Jugador 2</h2>
+        <div id="chars2" class="grid"></div>
+        <p class="sub coophint">🎮 <b class="p1">J1</b>: WASD · primer mando · mitad izquierda de la pantalla<br>🎮 <b class="p2">J2</b>: flechas · segundo mando · mitad derecha de la pantalla<br>Compartís experiencia y oro. Si uno cae, el otro puede reanimarlo quedándose a su lado.</p>
+      </div>
       <h2>Elige mapa</h2>
       <div id="maps" class="grid maps"></div>
       <div class="actions">
@@ -123,7 +133,7 @@
   <!-- Subida de nivel -->
   <div id="levelup" class="overlay hidden">
     <div class="panel wide">
-      <h2>¡Subes de nivel!</h2>
+      <h2 id="lvTitle">¡Subes de nivel!</h2>
       <div id="choices"></div>
     </div>
   </div>
