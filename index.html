@@ -52,6 +52,7 @@
         <li>⭐ Lleva un arma a <b>Nv. 5</b>, consigue su objeto clave y abre un <b>cofre</b> (lo sueltan élites y jefes) para <b>evolucionarla</b>.</li>
         <li>🪙 Gana oro en cada partida y gástalo en la <b>tienda</b>, en nuevos <b>personajes</b> y desbloquea <b>mapas</b> más difíciles.</li>
         <li>👥 <b>Cooperativo local</b>: J1 juega con WASD y J2 con las flechas, con un mando cada uno, o en una pantalla táctil (mitad izquierda J1, mitad derecha J2). Compartís nivel y oro, cada uno mejora sus propias armas por turnos y podéis reanimaros.</li>
+        <li>🌐 <b>Online</b>: con la sesión iniciada, uno crea una sala y el otro se une con su código de 5 letras. Cada uno juega en su dispositivo.</li>
         <li>⏸ <b>P</b> / <b>Esc</b> / <b>Start</b> para pausar. Teclas <b>1-4</b> (o A/B/X/Y en el mando) para elegir mejoras.</li>
       </ul>
       <button class="back">Volver</button>
@@ -100,8 +101,9 @@
     <div class="panel wide">
       <div class="topbar"><span class="gold">🪙 <b class="goldAmt">0</b></span></div>
       <div id="modeRow" class="seg">
-        <button data-m="1">👤 1 jugador</button>
-        <button data-m="2">👥 2 jugadores (local)</button>
+        <button data-m="solo">👤 1 jugador</button>
+        <button data-m="local">👥 2 jugadores (local)</button>
+        <button data-m="online">🌐 Online</button>
       </div>
       <h2 id="p1Title">Elige personaje</h2>
       <div id="chars" class="grid"></div>
@@ -110,8 +112,25 @@
         <div id="chars2" class="grid"></div>
         <p class="sub coophint">🎮 <b class="p1">J1</b>: WASD · primer mando · mitad izquierda de la pantalla<br>🎮 <b class="p2">J2</b>: flechas · segundo mando · mitad derecha de la pantalla<br>Compartís experiencia y oro. Si uno cae, el otro puede reanimarlo quedándose a su lado.</p>
       </div>
-      <h2>Elige mapa</h2>
+      <h2 id="mapTitle">Elige mapa</h2>
       <div id="maps" class="grid maps"></div>
+      <div id="onlineBox" class="hidden">
+        <div id="onlineNeedLogin" class="hidden">
+          <p class="sub">Para jugar online, los dos tenéis que <b>iniciar sesión</b> con vuestra cuenta.</p>
+          <button id="onlineLoginBtn">👤 Iniciar sesión</button>
+        </div>
+        <div id="onlineActions" class="hidden">
+          <p class="sub">Uno crea la sala y le pasa el código al otro, que se une con él.</p>
+          <div class="onlinegrid">
+            <button id="hostBtn" class="primary">🏠 Crear sala</button>
+            <div class="joinrow">
+              <input id="joinCode" maxlength="5" placeholder="CÓDIGO" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="Código de la sala">
+              <button id="joinBtn">🔗 Unirse</button>
+            </div>
+          </div>
+          <p id="onlineMsg" class="msg"></p>
+        </div>
+      </div>
       <div class="actions">
         <button class="back">Volver</button>
         <button id="startBtn" class="primary big">¡Comenzar!</button>
@@ -127,6 +146,20 @@
       <p class="sub">Mejoras permanentes para todas tus partidas.</p>
       <div id="shopGrid" class="grid shopgrid"></div>
       <div class="actions"><button class="back">Volver</button></div>
+    </div>
+  </div>
+
+  <!-- Sala online -->
+  <div id="lobby" class="overlay hidden">
+    <div class="panel">
+      <h2>🌐 Partida online</h2>
+      <div id="lobbyCode" class="roomcode hidden"></div>
+      <p id="lobbyStatus" class="msg"></p>
+      <div id="lobbyPlayers" class="lobbyplayers"></div>
+      <div class="actions">
+        <button id="lobbyCancel">Salir</button>
+        <button id="lobbyStart" class="primary hidden">¡Comenzar!</button>
+      </div>
     </div>
   </div>
 
@@ -171,6 +204,7 @@
 
   <script src="firebase-config.js"></script>
   <script src="cloud.js"></script>
+  <script src="net.js"></script>
   <script src="data.js"></script>
   <script src="audio.js"></script>
   <script src="game.js"></script>

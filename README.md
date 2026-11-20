@@ -28,6 +28,18 @@ En la pantalla de selección, elige **👥 2 jugadores (local)** y un personaje 
 - Hay más enemigos, más resistentes y con jefes más duros, pero se sube de nivel más rápido.
 - Con mando: **Start** pausa y **A/B/X/Y** eligen la mejora 1-4.
 
+### Cooperativo online
+
+Elige **🌐 Online** en la pantalla de selección. Los dos jugadores tienen que **iniciar sesión**.
+
+1. Uno pulsa **🏠 Crear sala**: aparece un **código de 5 letras**. Quien crea la sala elige el mapa.
+2. El otro escribe ese código y pulsa **🔗 Unirse**.
+3. Cuando el segundo jugador aparece en la sala, el anfitrión pulsa **¡Comenzar!**
+
+Funciona igual que el cooperativo local (nivel y oro compartidos, mejoras por turnos y reanimar), pero cada uno juega en su dispositivo con todos los controles. **Los dos ganáis oro** para vuestras cuentas. Si alguien pierde la conexión, el anfitrión sigue jugando solo.
+
+Cómo funciona por dentro: los dos navegadores se conectan directamente con **WebRTC**. Firebase solo se usa para intercambiar el código de la sala, y esa sala se borra al conectar. El anfitrión simula la partida y envía el estado unas 15 veces por segundo (hasta ~110 KB/s con la pantalla llena). El invitado mueve a su personaje en su propia pantalla, así no nota el retraso. Algunas redes muy restrictivas (por ejemplo, ciertas redes de empresa o universidad) no permiten la conexión directa; en ese caso, prueba con datos móviles.
+
 ### Armas
 
 | Arma | Efecto | Objeto clave | Evolución |
@@ -97,7 +109,7 @@ El juego no incluye servidor propio. Las cuentas usan **Firebase**, el servicio 
 2. En la página del proyecto, pulsa el icono **Web** (`</>`) para registrar una app web. Copia los valores de `firebaseConfig` (`apiKey`, `authDomain`, `projectId`, `appId`) en **`firebase-config.js`**.
 3. Ve a **Authentication → Comenzar** y, en *Método de inicio de sesión*, activa **Google** y **Correo electrónico/contraseña**.
 4. En **Authentication → Configuración → Dominios autorizados**, añade el dominio donde publiques el juego (por ejemplo `alexslaughter.github.io`).
-5. Ve a **Firestore Database → Crear base de datos** (modo producción). En la pestaña **Reglas**, pega el contenido de **`firestore.rules`** y pulsa **Publicar**. Así cada jugador solo puede leer y escribir su propio progreso.
+5. Ve a **Firestore Database → Crear base de datos** (modo producción). En la pestaña **Reglas**, pega el contenido de **`firestore.rules`** y pulsa **Publicar**. Así cada jugador solo puede leer y escribir su propio progreso, y las salas online solo las gestionan sus jugadores.
 
 Los valores de `firebase-config.js` no son secretos y se pueden subir al repositorio; la seguridad la dan las reglas del paso 5. El plan gratuito de Firebase es de sobra para este juego.
 
@@ -119,7 +131,8 @@ Para publicarlo gratis, activa **GitHub Pages** en *Settings → Pages* con esta
 - `style.css`: estilos adaptables de la interfaz.
 - `data.js`: datos de armas, objetos, enemigos, personajes, mapas y tienda.
 - `audio.js`: efectos de sonido y música procedural.
-- `cloud.js`: inicio de sesión y guardado en la nube con Firebase.
+- `cloud.js`: inicio de sesión, guardado en la nube y salas online con Firebase.
+- `net.js`: conexión directa entre jugadores (WebRTC) para el cooperativo online.
 - `firebase-config.js`: configuración de tu proyecto de Firebase.
 - `firestore.rules`: reglas de seguridad de la base de datos.
 - `game.js`: motor del juego (entrada, aparición de enemigos, armas, colisiones con rejilla espacial, renderizado, menús y guardado).

@@ -28,6 +28,8 @@ window.Cloud = (() => {
     'auth/network-request-failed': 'Sin conexión a Internet.',
     'permission-denied': 'El servidor rechazó el guardado. Revisa las reglas de Firestore.',
     'unavailable': 'Sin conexión con el servidor. Se reintentará más tarde.',
+    'room/not-found': 'No existe ninguna sala con ese código.',
+    'room/full': 'Esa sala ya tiene dos jugadores.',
   };
   C.message = e => MSG[e && e.code] || ('Error: ' + ((e && (e.code || e.message)) || 'desconocido'));
 
@@ -79,6 +81,16 @@ window.Cloud = (() => {
     name: C.user.name,
     updatedAt: fb.serverTimestamp(),
   });
+
+  // Salas para el cooperativo online: solo guardan la "presentación" WebRTC (oferta y respuesta).
+  const room = code => fb.doc(db, 'rooms', code);
+  C.rooms = {
+    create: (code, data) => fb.setDoc(room(code), Object.assign({}, data, { host: C.user.uid, created: fb.serverTimestamp() })),
+    get: async code => { const s = await fb.getDoc(room(code)); return s.exists() ? s.data() : null; },
+    answer: (code, answer) => fb.updateDoc(room(code), { answer, guest: C.user.uid }),
+    watch: (code, cb) => fb.onSnapshot(room(code), s => cb(s.exists() ? s.data() : null), err => cb(null, err)),
+    remove: code => fb.deleteDoc(room(code)),
+  };
 
   init();
   return C;

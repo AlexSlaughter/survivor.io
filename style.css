@@ -209,3 +209,16 @@ h2.p1, b.p1 { color: #4de1ff; }
 h2.p2, b.p2 { color: #ff6fb5; }
 .coophint { font-size: 13px; line-height: 1.6; }
 #p2Wrap .sel.on { border-color: #ff6fb5; box-shadow: 0 0 0 2px rgba(255, 111, 181, .25); }
+
+/* ---------- Online ---------- */
+#onlineBox { margin: 4px 0 8px; padding: 14px; background: rgba(18, 22, 47, .7); border: 1px solid #2d3470; border-radius: 14px; }
+.onlinegrid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; }
+.onlinegrid > button { margin: 0; }
+.joinrow { display: flex; gap: 6px; align-items: center; }
+.joinrow input { width: 130px; margin: 0; text-align: center; text-transform: uppercase; letter-spacing: 4px; font-weight: 700; }
+.joinrow button { margin: 0; }
+.roomcode { font-size: clamp(36px, 12vw, 54px); font-weight: 800; letter-spacing: 10px; color: #7fe3ff; text-shadow: 0 0 20px rgba(80, 200, 255, .5); margin: 4px 0 8px; -webkit-user-select: text; user-select: text; }
+.lobbyplayers { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; text-align: left; }
+.lobbyplayers .lp { padding: 10px 12px; border-radius: 10px; border-left: 4px solid; background: rgba(18, 22, 47, .7); }
+.waiting { font-size: 32px; animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { opacity: .35; } }

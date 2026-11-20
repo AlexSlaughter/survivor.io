@@ -52,7 +52,7 @@
 
   // ---------- Guardado ----------
   const SAVE_KEY = 'hn_save_v1';
-  const defaultSave = () => ({ gold: 0, up: {}, chars: ['aria'], char: 'aria', map: 'bosque', best: {}, wins: {}, sfx: true, music: true, t: 0, coop: false, char2: 'aria' });
+  const defaultSave = () => ({ gold: 0, up: {}, chars: ['aria'], char: 'aria', map: 'bosque', best: {}, wins: {}, sfx: true, music: true, t: 0, mode: 'solo', char2: 'aria' });
   function loadSave() {
     let s = null;
     try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* sin almacenamiento */ }
@@ -90,7 +90,7 @@
     }
     if (d.chars.includes(o.char)) d.char = o.char;
     if (d.chars.includes(o.char2)) d.char2 = o.char2;
-    d.coop = o.coop === true;
+    d.mode = ['solo', 'local', 'online'].includes(o.mode) ? o.mode : (o.coop === true ? 'local' : 'solo');
     if (MAPS.some(m => m.id === o.map)) d.map = o.map;
     d.sfx = o.sfx !== false; d.music = o.music !== false;
     d.t = Number.isFinite(+o.t) ? +o.t : 0;
@@ -167,11 +167,13 @@
   let G = null;
   let state = 'menu'; // menu | play | levelup | paused | over | win
 
-  function makePlayer(ch, idx, x) {
+  // `up` son las mejoras de la tienda de quien controla al personaje (en online, las del invitado).
+  function makePlayer(ch, idx, x, up = S.up) {
+    const ul = id => Math.floor(+up[id] || 0);
     const m = ch.mods;
     const p = {
       idx, x, y: 0, r: 14, hp: 100, maxHp: 100, inv: 0, face: { x: 1, y: 0 }, side: 1, walk: 0, ch,
-      color: PCOLORS[idx], down: false, reviveT: 0, revives: upLvl('renacer'),
+      color: PCOLORS[idx], down: false, reviveT: 0, revives: ul('renacer'), choices: 3 + ul('vision'),
       stats: { dmg: 1, cd: 1, speed: 1, regen: 0, magnet: 1, area: 1, proj: 0, armor: 0, xp: 1, gold: 1 },
       weapons: [], passives: {},
     };
@@ -180,22 +182,24 @@
     p.maxHp += m.hp || 0; s.armor += m.armor || 0; s.speed += m.speed || 0; s.magnet += m.magnet || 0;
     s.dmg += m.dmg || 0; s.area += m.area || 0; s.cd *= m.cd || 1; s.regen += m.regen || 0;
     // Tienda
-    s.dmg += 0.05 * upLvl('poder');
-    p.maxHp += 10 * upLvl('vida');
-    s.armor += upLvl('armadura');
-    s.speed += 0.04 * upLvl('agilidad');
-    s.cd *= Math.pow(0.97, upLvl('recarga'));
-    s.magnet += 0.10 * upLvl('magnetismo');
-    s.xp += 0.08 * upLvl('sabiduria');
-    s.gold += 0.10 * upLvl('codicia');
+    s.dmg += 0.05 * ul('poder');
+    p.maxHp += 10 * ul('vida');
+    s.armor += ul('armadura');
+    s.speed += 0.04 * ul('agilidad');
+    s.cd *= Math.pow(0.97, ul('recarga'));
+    s.magnet += 0.10 * ul('magnetismo');
+    s.xp += 0.08 * ul('sabiduria');
+    s.gold += 0.10 * ul('codicia');
     p.hp = p.maxHp;
     return p;
   }
 
-  function newGame() {
-    const map = mapById(S.map), coop = !!S.coop;
-    const players = [makePlayer(charById(S.char), 0, coop ? -30 : 0)];
-    if (coop) players.push(makePlayer(charById(S.char2), 1, 30));
+  // `online` (solo el anfitrión): { map, chars, ups, names, vw, vh } acordados en la sala.
+  function newGame(online) {
+    const map = mapById(online ? online.map : S.map), coop = !!online || S.mode === 'local';
+    const chars = online ? online.chars : [S.char, S.char2], ups = online ? online.ups : [S.up, S.up];
+    const players = [makePlayer(charById(chars[0]), 0, coop ? -30 : 0, ups[0])];
+    if (coop) players.push(makePlayer(charById(chars[1]), 1, 30, ups[1]));
     G = {
       time: 0, spawnAcc: 0, nextElite: 60, nextSwarm: 45, bossIdx: 0, shake: 0, pending: 0,
       boss: null, opts: [], map, gold: 0, coins: 0, bossKills: 0,
@@ -203,7 +207,9 @@
       level: 1, xp: 0, xpNext: 5, kills: 0, chooser: 0, chooserP: null,
       // Con dos jugadores aparecen más enemigos y son más resistentes.
       diffHp: coop ? 1.25 : 1, diffRate: coop ? 1.4 : 1, diffBoss: coop ? 1.6 : 1,
-      choices: 3 + upLvl('vision'),
+      online: online ? 'host' : null, localIdx: 0, names: online ? online.names : null,
+      remote: null, remoteVW: online ? online.vw : 0, remoteVH: online ? online.vh : 0,
+      leash: null, eid: 0, netEvents: [], netT: 0,
       enemies: [], bullets: [], ebullets: [], gems: [], pickups: [], particles: [], texts: [], effects: [],
     };
     for (const p of players) addWeapon(p, p.ch.weapon);
@@ -240,15 +246,15 @@
     if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
     if (state === 'levelup') {
       const i = ['Digit1', 'Digit2', 'Digit3', 'Digit4'].indexOf(e.code);
-      if (i >= 0 && G.opts[i]) choose(G.opts[i]);
+      if (i >= 0) pickIndex(i);
     }
-    if ((state === 'over' || state === 'win') && e.code === 'Enter' && !(e.target instanceof HTMLButtonElement)) start();
+    if ((state === 'over' || state === 'win') && e.code === 'Enter' && !(e.target instanceof HTMLButtonElement)) retry();
   });
   addEventListener('keyup', e => { keys[e.code] = false; });
   addEventListener('blur', () => { for (const k in keys) keys[k] = false; releaseJoys(); });
   canvas.addEventListener('pointerdown', e => {
     if (state !== 'play') return;
-    const j = joys[G.coop && e.clientX >= W / 2 ? 1 : 0];
+    const j = joys[G.coop && !G.online && e.clientX >= W / 2 ? 1 : 0];
     if (j.active) return;
     j.active = true; j.id = e.pointerId;
     j.ox = j.x = e.clientX; j.oy = j.y = e.clientY;
@@ -277,31 +283,33 @@
       padPrev[i] = now;
       if (hit(9)) togglePause();
       if (state === 'levelup') {
-        for (let k = 0; k < 4; k++) if (hit(k) && G.opts[k]) { choose(G.opts[k]); break; }
+        for (let k = 0; k < 4; k++) if (hit(k)) { pickIndex(k); break; }
       }
     });
   }
 
   function inputDir(idx) {
     let dx = 0, dy = 0;
-    if (!G.coop || idx === 0) {
+    // En solitario y en online, el jugador de esta pantalla usa todos los controles.
+    const solo = !G.coop || !!G.online;
+    if (solo || idx === 0) {
       if (keys.KeyW) dy -= 1;
       if (keys.KeyS) dy += 1;
       if (keys.KeyA) dx -= 1;
       if (keys.KeyD) dx += 1;
     }
-    if (!G.coop || idx === 1) {
+    if (solo || idx === 1) {
       if (keys.ArrowUp) dy -= 1;
       if (keys.ArrowDown) dy += 1;
       if (keys.ArrowLeft) dx -= 1;
       if (keys.ArrowRight) dx += 1;
     }
-    const j = joys[idx];
+    const j = joys[solo ? 0 : idx];
     if (j.active) {
       const jx = j.x - j.ox, jy = j.y - j.oy, l = Math.hypot(jx, jy);
       if (l > 6) { const m = Math.min(l, JR) / JR; dx += jx / l * m; dy += jy / l * m; }
     }
-    const pads = getPads(), pad = G.coop ? pads[idx] : pads[0];
+    const pads = getPads(), pad = solo ? pads[0] : pads[idx];
     if (pad) {
       const ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
       if (Math.hypot(ax, ay) > 0.2) { dx += ax; dy += ay; }
@@ -358,17 +366,31 @@
   }
 
   // ---------- Efectos ----------
+  // En online, el anfitrión apunta los efectos (sonidos, textos, partículas, avisos) para enviarlos al invitado.
+  function netOut(ev) { if (G && G.online === 'host' && G.netEvents.length < 300) G.netEvents.push(ev); }
+  const sfxLast = {};
+  function sfx(name, gap = 0.03) {
+    Sound.play(name, gap);
+    if (G && G.online === 'host') {
+      const t = performance.now() / 1000;
+      if (t - (sfxLast[name] || 0) >= gap) { sfxLast[name] = t; netOut(['s', name, gap]); }
+    }
+  }
   function addText(x, y, txt, color) {
     if (G.texts.length < 90) G.texts.push({ x, y, txt, color, life: 0.7 });
+    // Como mucho 30 números de daño por instantánea para no saturar la conexión.
+    if (G.online === 'host' && (G.netTexts = (G.netTexts || 0) + 1) <= 30) netOut(['t', Math.round(x), Math.round(y), txt, color]);
   }
   function burst(x, y, color, n, speed = 120) {
+    netOut(['b', Math.round(x), Math.round(y), color, n, speed]);
     for (let i = 0; i < n && G.particles.length < 400; i++) {
       const a = rand(0, TAU), s = rand(speed * 0.3, speed);
       G.particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.3, 0.6), max: 0.6, color, size: rand(2, 4) });
     }
   }
   let toastTimer = 0;
-  function toast(msg) {
+  function toast(msg, localOnly) {
+    if (!localOnly) netOut(['m', msg]);
     const t = $('toast');
     t.textContent = msg;
     t.classList.remove('hidden');
@@ -384,7 +406,7 @@
     if (kb && !e.boss) { const f = e.elite ? 0.3 : 1; e.kx += kx * kb * f; e.ky += ky * kb * f; }
     if (!quiet) {
       addText(e.x + rand(-6, 6), e.y - e.r, Math.round(dmg), dmg >= 60 ? '#ffcf4d' : '#ffffff');
-      Sound.play('hit', 0.05);
+      sfx('hit', 0.05);
     }
     if (e.hp <= 0) kill(e);
   }
@@ -392,7 +414,7 @@
   function kill(e) {
     e.dead = true;
     G.kills++;
-    Sound.play('kill', 0.04);
+    sfx('kill', 0.04);
     burst(e.x, e.y, e.color, e.boss ? 50 : e.elite ? 20 : 6, e.boss ? 260 : 120);
     dropGem(e.x, e.y, e.xp);
     if (e.elite || e.boss) G.pickups.push({ type: 'cofre', x: e.x, y: e.y, t: 0 });
@@ -444,7 +466,7 @@
     G.shake = Math.max(G.shake, 6);
     addText(p.x, p.y - 26, '-' + Math.round(dmg), '#ff5c6c');
     burst(p.x, p.y, '#ff5c6c', 8);
-    Sound.play('hurt', 0.15);
+    sfx('hurt', 0.15);
     if (p.hp > 0) return;
     if (p.revives > 0) {
       p.revives--;
@@ -453,7 +475,7 @@
       for (const b of G.ebullets) b.dead = true;
       burst(p.x, p.y, '#fff7c2', 60, 320);
       G.shake = 12;
-      Sound.play('revive');
+      sfx('revive');
       toast(`🕊️ ${ptag(p)}¡Renaces de tus cenizas!`);
     } else if (G.coop && alive().length > 1) {
       // En cooperativo, el jugador cae y su compañero puede reanimarlo.
@@ -487,7 +509,7 @@
           pierce: ev ? 3 : (lv >= 4 ? 1 : 0), hit: new Set(),
         });
       }
-      Sound.play('shoot', 0.08);
+      sfx('shoot', 0.08);
     },
     orbe(w, dt, p, s) {
       const lv = w.lvl, ev = w.evolved;
@@ -530,11 +552,13 @@
       shuffle(vis);
       for (let i = 0; i < n; i++) {
         const t = vis[i % vis.length], tx = t.x, ty = t.y;
-        G.effects.push({ type: 'bolt', x: tx, y: ty, R, life: 0.3, max: 0.3, seed: Math.random() * 1000 | 0, ev });
+        const seed = Math.random() * 1000 | 0;
+        G.effects.push({ type: 'bolt', x: tx, y: ty, R, life: 0.3, max: 0.3, seed, ev });
+        netOut(['z', Math.round(tx), Math.round(ty), R, seed, ev ? 1 : 0]);
         query(tx, ty, R, e => hurt(e, dmg));
       }
       G.shake = Math.max(G.shake, 2);
-      Sound.play('zap', 0.1);
+      sfx('zap', 0.1);
     },
     disco(w, dt, p, s) {
       w.t -= dt;
@@ -552,7 +576,7 @@
           t: 0, out: 0.6, r, dmg, hits: new Map(), life: 5, rot: 0,
         });
       }
-      Sound.play('disc', 0.1);
+      sfx('disc', 0.1);
     },
   };
 
@@ -601,32 +625,59 @@
     return p;
   }
 
-  function openLevelUp() {
-    state = 'levelup';
-    releaseJoys();
-    Sound.play('level');
-    const p = G.chooserP = levelChooser();
-    G.opts = buildOptions(p, G.choices);
-    const title = $('lvTitle');
-    if (G.coop) title.innerHTML = `¡Subes de nivel! <span style="color:${p.color}">Elige ${pname(p)} (${esc(p.ch.name)})</span>`;
-    else title.textContent = '¡Subes de nivel!';
+  // Pinta las tarjetas de mejora (las usan el anfitrión y el invitado).
+  function renderChoices(titleHtml, descs, onPick) {
+    $('lvTitle').innerHTML = titleHtml;
     const box = $('choices');
     box.innerHTML = '';
-    G.opts.forEach((o, i) => {
-      const d = describe(p, o);
+    descs.forEach((d, i) => {
       const b = document.createElement('button');
       b.className = 'card';
       b.innerHTML =
         `<span class="key">${i + 1}</span><div class="icon">${d.icon}</div>` +
         `<div><div class="title">${d.title}<span class="lvl${d.isNew ? ' new' : ''}">${d.lvl}</span></div>` +
         `<div class="desc">${d.desc}</div>${d.hint ? `<div class="hint">${d.hint}</div>` : ''}</div>`;
-      b.addEventListener('click', () => choose(o));
+      b.addEventListener('click', () => onPick(i));
       box.appendChild(b);
     });
     // Evita elegir sin querer con un toque que venía del juego.
     box.style.pointerEvents = 'none';
     setTimeout(() => { box.style.pointerEvents = ''; }, 250);
     showOnly('levelup');
+  }
+  function showWaiting(text, color) {
+    $('lvTitle').innerHTML = `<span style="color:${color || '#ffd75e'}">${text}</span>`;
+    $('choices').innerHTML = '<p class="sub waiting">⏳</p>';
+    showOnly('levelup');
+  }
+
+  function openLevelUp() {
+    state = 'levelup';
+    releaseJoys();
+    sfx('level');
+    const p = G.chooserP = levelChooser();
+    G.opts = buildOptions(p, p.choices);
+    const descs = G.opts.map(o => describe(p, o));
+    if (G.online === 'host') {
+      if (p.idx !== G.localIdx) {
+        Net.send({ t: 'lvl', opts: descs });
+        showWaiting(`Esperando a que ${esc(G.names[p.idx])} elija su mejora…`, p.color);
+        return;
+      }
+      Net.send({ t: 'wait', who: p.idx });
+      renderChoices('¡Subes de nivel! <span style="color:' + p.color + '">Te toca elegir</span>', descs, pickIndex);
+      return;
+    }
+    const title = G.coop ? `¡Subes de nivel! <span style="color:${p.color}">Elige ${pname(p)} (${esc(p.ch.name)})</span>` : '¡Subes de nivel!';
+    renderChoices(title, descs, pickIndex);
+  }
+
+  // Elige la mejora i (teclas 1-4, botones del mando o toque), si le toca a esta pantalla.
+  function pickIndex(i) {
+    if (state !== 'levelup' || !G) return;
+    if (G.online === 'guest') { if (G.guestOpts && G.guestOpts[i]) guestChoose(i); return; }
+    if (G.online === 'host' && G.chooserP.idx !== G.localIdx) return;
+    if (G.opts[i]) choose(G.opts[i]);
   }
 
   function choose(o) {
@@ -636,7 +687,10 @@
     if (G.coop) G.chooser = (G.chooserP.idx + 1) % G.players.length;
     G.pending--;
     if (G.pending > 0) openLevelUp();
-    else { state = 'play'; showOnly(null); }
+    else {
+      state = 'play'; showOnly(null);
+      if (G.online === 'host') Net.send({ t: 'go' });
+    }
   }
 
   function openChest(p) {
@@ -647,11 +701,11 @@
       ev.evolved = true;
       G.shake = 8;
       burst(p.x, p.y, '#ffd75e', 40, 260);
-      Sound.play('evolve');
+      sfx('evolve');
       toast(`${ptag(p)}¡EVOLUCIÓN! ${WEAPONS[ev.id].icon} ${WEAPONS[ev.id].evoName}`);
       return;
     }
-    Sound.play('chest');
+    sfx('chest');
     const ups = [];
     for (const w of p.weapons) if (!w.evolved && w.lvl < WMAX) ups.push({ k: 'w', id: w.id });
     for (const id in p.passives) if (p.passives[id] < PASSIVES[id].max) ups.push({ k: 'p', id });
@@ -681,6 +735,7 @@
       flash: 0, kx: 0, ky: 0, slow: 0, elite: !!m.elite, boss: false, wob: rand(0, TAU),
     };
     e.maxHp = e.hp;
+    e.id = ++G.eid;
     G.enemies.push(e);
     return e;
   }
@@ -693,10 +748,11 @@
       flash: 0, kx: 0, ky: 0, slow: 0, boss: true, final: b.final, name: b.name, shots: b.shots,
       shotT: 3, wob: 0, phase: 0,
     };
+    e.id = ++G.eid;
     G.enemies.push(e);
     G.boss = e;
     G.shake = 10;
-    Sound.play('boss');
+    sfx('boss');
     toast(`⚠ ${b.name} se acerca`);
   }
 
@@ -719,7 +775,7 @@
     if (t >= G.nextElite) {
       G.nextElite += 60;
       spawnEnemy('bruto', { hp: 8, size: 1.5, xp: 10, elite: true, speed: 1.15, dmg: 1.5 });
-      if (!G.boss) { toast('¡Ha aparecido un enemigo élite!'); Sound.play('warn'); }
+      if (!G.boss) { toast('¡Ha aparecido un enemigo élite!'); sfx('warn'); }
     }
     if (t >= G.nextSwarm) {
       G.nextSwarm += 45;
@@ -738,7 +794,9 @@
   function updatePlayers(dt) {
     const both = G.coop && alive().length === 2;
     // Los dos jugadores deben caber en pantalla: nadie puede alejarse del centro más que esto.
-    const hw = VW / 2 - 40, hh = VH / 2 - 50;
+    const lw = Math.min(VW, G.remoteVW || VW), lh = Math.min(VH, G.remoteVH || VH);
+    const hw = lw / 2 - 40, hh = lh / 2 - 50;
+    G.leash = [Math.round(hw), Math.round(hh)];
     for (const p of G.players) {
       if (p.down) {
         const helper = G.players.find(q => q !== p && !q.down && dist2(q.x, q.y, p.x, p.y) < 55 * 55);
@@ -747,10 +805,18 @@
           if (p.reviveT >= REVIVE_TIME) {
             p.down = false; p.reviveT = 0; p.hp = p.maxHp * 0.4; p.inv = 2;
             burst(p.x, p.y, '#b6ffcf', 40, 260);
-            Sound.play('revive');
+            sfx('revive');
             toast(`💚 ${pname(helper)} ha reanimado a ${pname(p)}`);
           }
         } else p.reviveT = Math.max(0, p.reviveT - dt * 0.5);
+        continue;
+      }
+      if (G.online === 'host' && p.idx !== G.localIdx) {
+        // El invitado mueve a su personaje en su propia pantalla y nos envía la posición.
+        const r = G.remote;
+        if (r) { p.x = r.x; p.y = r.y; p.face = { x: r.fx, y: r.fy }; p.side = r.side; p.walk = r.walk; }
+        p.inv -= dt;
+        if (p.stats.regen) p.hp = Math.min(p.maxHp, p.hp + p.stats.regen * dt);
         continue;
       }
       const { dx, dy } = inputDir(p.idx);
@@ -892,7 +958,7 @@
     for (const g of G.gems) {
       attract(g, dt);
       const p = touching(g, 6);
-      if (p) { g.dead = true; gainXp(g.v, p); Sound.play('gem', 0.035); }
+      if (p) { g.dead = true; gainXp(g.v, p); sfx('gem', 0.035); }
     }
   }
 
@@ -903,14 +969,14 @@
       const p = touching(k, 16);
       if (!p) continue;
       k.dead = true;
-      if (k.type === 'carne') { heal(p, 30); Sound.play('coin'); }
+      if (k.type === 'carne') { heal(p, 30); sfx('coin'); }
       else if (k.type === 'iman') {
         for (const g of G.gems) g.mag = true;
         for (const c of G.pickups) if (c.type === 'moneda') c.mag = true;
-        Sound.play('chest');
+        sfx('chest');
         toast('🧲 ¡Todos los cristales vienen a ti!');
       } else if (k.type === 'cofre') openChest(p);
-      else if (k.type === 'moneda') { G.gold += k.v; G.coins--; Sound.play('coin', 0.05); }
+      else if (k.type === 'moneda') { G.gold += k.v; G.coins--; sfx('coin', 0.05); }
     }
   }
 
@@ -1462,7 +1528,7 @@
   }
 
   // ---------- Menús ----------
-  const overlays = ['menu', 'help', 'account', 'select', 'shop', 'levelup', 'pause', 'end'];
+  const overlays = ['menu', 'help', 'account', 'select', 'shop', 'lobby', 'levelup', 'pause', 'end'];
   function showOnly(id) { for (const o of overlays) $(o).classList.toggle('hidden', o !== id); }
 
   function refreshGold() { document.querySelectorAll('.goldAmt').forEach(el => { el.textContent = S.gold; }); }
@@ -1524,12 +1590,22 @@
 
   function renderSelect() {
     refreshGold();
-    document.querySelectorAll('#modeRow button').forEach(b => b.classList.toggle('on', (b.dataset.m === '2') === !!S.coop));
-    $('p1Title').textContent = S.coop ? 'Jugador 1' : 'Elige personaje';
-    $('p1Title').classList.toggle('p1', !!S.coop);
-    $('p2Wrap').classList.toggle('hidden', !S.coop);
+    const mode = S.mode;
+    document.querySelectorAll('#modeRow button').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+    $('p1Title').textContent = mode === 'local' ? 'Jugador 1' : mode === 'online' ? 'Tu personaje' : 'Elige personaje';
+    $('p1Title').classList.toggle('p1', mode === 'local');
+    $('p2Wrap').classList.toggle('hidden', mode !== 'local');
+    $('onlineBox').classList.toggle('hidden', mode !== 'online');
+    $('startBtn').classList.toggle('hidden', mode === 'online');
+    $('mapTitle').textContent = mode === 'online' ? 'Elige mapa (lo decide quien crea la sala)' : 'Elige mapa';
     renderCharGrid('chars', 'char');
-    if (S.coop) renderCharGrid('chars2', 'char2');
+    if (mode === 'local') renderCharGrid('chars2', 'char2');
+    if (mode === 'online') {
+      const ok = Cloud.configured && !!Cloud.user;
+      $('onlineNeedLogin').classList.toggle('hidden', ok);
+      $('onlineActions').classList.toggle('hidden', !ok);
+      $('onlineMsg').textContent = '';
+    }
     const mbox = $('maps');
     mbox.innerHTML = '';
     for (const m of MAPS) {
@@ -1676,38 +1752,414 @@
     setMsg(cloudErr || '✔ Sesión iniciada. Progreso sincronizado.', !!cloudErr);
   });
 
-  // ---------- Flujo de partida ----------
-  function start() {
+  // ---------- Online ----------
+  // El anfitrión simula la partida y envía instantáneas ~20 veces por segundo.
+  // El invitado mueve a su personaje en su pantalla, envía su posición y dibuja el resto interpolado.
+  const ETYPE_IDS = ['slime', 'murcielago', 'espectro', 'bruto', 'boss'];
+  const ETYPE_IDX = { slime: 0, murcielago: 1, espectro: 2, bruto: 3, boss: 4 };
+  const PICK_IDS = ['cofre', 'carne', 'iman', 'moneda'];
+  const PICK_IDX = { cofre: 0, carne: 1, iman: 2, moneda: 3 };
+  const r1 = v => Math.round(v * 10) / 10;
+  let lobby = null;      // { role, remote } mientras se prepara la sala
+  let lastOnline = null; // 'host' | 'guest' tras una partida online (para la revancha)
+
+  function makeSnapshot() {
+    const hw = Math.max(VW, G.remoteVW || 0) / 2 + 160, hh = Math.max(VH, G.remoteVH || 0) / 2 + 160;
+    const near = o => Math.abs(o.x - G.cx) < hw && Math.abs(o.y - G.cy) < hh;
+    const R = Math.round;
+    const snap = {
+      t: 's', time: G.time, lvl: G.level, xp: r1(G.xp), xpn: G.xpNext, k: G.kills, g: G.gold, sh: r1(G.shake),
+      lw: G.leash || [400, 300],
+      b: G.boss && !G.boss.dead ? [G.boss.name, R(G.boss.hp), R(G.boss.maxHp), G.boss.color] : 0,
+      p: G.players.map(p => [r1(p.x), r1(p.y), r1(p.hp), p.maxHp, p.down ? 1 : 0, r1(p.reviveT), r1(p.face.x), r1(p.face.y),
+        p.side, r1(p.walk), r1(p.inv), p.revives, p.stats.speed,
+        p.weapons.map(w => [w.id, w.lvl, w.evolved ? 1 : 0, Math.round(w.angle * 100) / 100, w.n || 0, r1(w.R || 0), r1(w.br || 0)]),
+        p.passives]),
+      e: [], bu: [], eb: [], gm: [], pk: [], ev: G.netEvents.splice(0),
+    };
+    for (const e of G.enemies) {
+      if (e.dead || !near(e)) continue;
+      // Formato compacto: id, tipo, x, y, banderas (golpeado, élite, jefe, final) y, solo para élites y jefes, radio y vida.
+      const f = (e.flash > 0 ? 1 : 0) | (e.elite ? 2 : 0) | (e.boss ? 4 : 0) | (e.final ? 8 : 0);
+      const row = [e.id, ETYPE_IDX[e.type], R(e.x), R(e.y), f];
+      if (e.elite || e.boss) row.push(r1(e.r), Math.round(e.hp / e.maxHp * 100) / 100);
+      snap.e.push(row);
+    }
+    G.netTexts = 0;
+    for (const b of G.bullets) if (!b.dead && near(b)) snap.bu.push(b.kind === 'chispa' ? [0, R(b.x), R(b.y), R(b.vx), R(b.vy), r1(b.r), b.ev ? 1 : 0, 0] : [1, R(b.x), R(b.y), 0, 0, r1(b.r), b.ev ? 1 : 0, r1(b.rot)]);
+    for (const b of G.ebullets) if (!b.dead && near(b)) snap.eb.push([R(b.x), R(b.y), R(b.vx), R(b.vy), b.r, b.color]);
+    for (const g of G.gems) if (!g.dead && near(g)) snap.gm.push(g.v === 1 ? [R(g.x), R(g.y)] : [R(g.x), R(g.y), g.v]);
+    for (const k of G.pickups) if (!k.dead && near(k)) snap.pk.push([PICK_IDX[k.type], R(k.x), R(k.y), r1(k.t)]);
+    return snap;
+  }
+
+  function viewPlayer(ch, idx, x) {
+    return {
+      idx, x, y: 0, px: x, py: 0, tx: x, ty: 0, r: 14, hp: 100, maxHp: 100, inv: 0, face: { x: 1, y: 0 }, side: 1, walk: 0,
+      ch, color: PCOLORS[idx], down: false, reviveT: 0, revives: 0, stats: { speed: 1 }, weapons: [], passives: {},
+    };
+  }
+
+  function startGuest(m) {
     Sound.init();
-    newGame();
+    lastOnline = 'guest';
+    G = {
+      online: 'guest', localIdx: 1, coop: true, map: mapById(m.map), names: m.names,
+      time: 0, level: 1, xp: 0, xpNext: 5, kills: 0, gold: 0, shake: 0, boss: null, cx: 0, cy: 0, leash: [400, 300],
+      players: m.chars.map((c, i) => viewPlayer(charById(c), i, i ? 30 : -30)),
+      enemies: [], emap: new Map(), bullets: [], ebullets: [], gems: [], pickups: [], particles: [], texts: [], effects: [],
+      snapT: performance.now(), snapDt: 0.05, sendT: 0, guestOpts: null, opts: [],
+    };
+    G.p = G.players[G.localIdx];
+    beginPlay();
+    toast(`🌐 Jugando con ${m.names[0]}` + (isTouch ? ' · arrastra el dedo para moverte' : ''), true);
+  }
+
+  function applySnapshot(sn) {
+    const now = performance.now();
+    G.snapDt = Math.max(0.04, Math.min(0.25, (now - G.snapT) / 1000));
+    G.snapT = now;
+    G.time = sn.time; G.level = sn.lvl; G.xp = sn.xp; G.xpNext = sn.xpn; G.kills = sn.k; G.gold = sn.g;
+    G.shake = Math.max(G.shake, sn.sh || 0); G.leash = sn.lw;
+    G.boss = sn.b ? { name: sn.b[0], hp: sn.b[1], maxHp: sn.b[2], color: sn.b[3], dead: false } : null;
+    sn.p.forEach((v, i) => {
+      const p = G.players[i];
+      if (!p) return;
+      const [x, y, hp, maxHp, down, reviveT, fx, fy, side, walk, inv, revives, speed, weapons, passives] = v;
+      const wasDown = p.down;
+      Object.assign(p, {
+        hp, maxHp, down: !!down, reviveT, inv, revives, passives,
+        weapons: weapons.map(w => ({ id: w[0], lvl: w[1], evolved: !!w[2], angle: w[3], n: w[4], R: w[5], br: w[6] })),
+      });
+      p.stats.speed = speed;
+      if (i === G.localIdx) {
+        // Nuestra posición la decide esta pantalla, salvo si estamos caídos o muy desincronizados.
+        if (p.down || wasDown || dist2(p.x, p.y, x, y) > 300 * 300) { p.x = x; p.y = y; }
+      } else {
+        p.px = p.x; p.py = p.y; p.tx = x; p.ty = y;
+        if (dist2(p.x, p.y, x, y) > 400 * 400) { p.px = x; p.py = y; }
+        p.face = { x: fx, y: fy }; p.side = side; p.walk = walk;
+      }
+    });
+    const seen = new Set(), list = [];
+    for (const v of sn.e) {
+      const [id, ti, x, y, f, r, hpk] = v;
+      let e = G.emap.get(id);
+      if (!e) { e = { id, x, y, wob: rand(0, TAU), flash: 0 }; G.emap.set(id, e); }
+      e.px = e.x; e.py = e.y; e.tx = x; e.ty = y;
+      if (dist2(e.x, e.y, x, y) > 300 * 300) { e.px = x; e.py = y; }
+      e.type = ETYPE_IDS[ti]; e.elite = !!(f & 2); e.boss = !!(f & 4); e.final = !!(f & 8);
+      e.r = r || ETYPES[e.type].r;
+      if (f & 1) e.flash = 0.08;
+      e.hp = hpk ?? 1; e.maxHp = 1;
+      e.color = e.boss ? (G.boss ? G.boss.color : '#8a5cff') : G.map.colors[e.type];
+      seen.add(id); list.push(e);
+    }
+    for (const id of [...G.emap.keys()]) if (!seen.has(id)) G.emap.delete(id);
+    G.enemies = list;
+    G.bullets = sn.bu.map(v => ({ kind: v[0] ? 'disco' : 'chispa', x: v[1], y: v[2], vx: v[3], vy: v[4], r: v[5], ev: !!v[6], rot: v[7] }));
+    G.ebullets = sn.eb.map(v => ({ x: v[0], y: v[1], vx: v[2], vy: v[3], r: v[4], color: v[5] }));
+    G.gems = sn.gm.map(v => ({ x: v[0], y: v[1], v: v[2] || 1 }));
+    G.pickups = sn.pk.map(v => ({ type: PICK_IDS[v[0]], x: v[1], y: v[2], t: v[3] }));
+    for (const ev of sn.ev) applyEvent(ev);
+  }
+
+  function applyEvent(ev) {
+    switch (ev[0]) {
+      case 's': Sound.play(ev[1], ev[2]); break;
+      case 't': addText(ev[1], ev[2], ev[3], ev[4]); break;
+      case 'b': burst(ev[1], ev[2], ev[3], ev[4], ev[5]); break;
+      case 'm': toast(ev[1]); break;
+      case 'z': G.effects.push({ type: 'bolt', x: ev[1], y: ev[2], R: ev[3], life: 0.3, max: 0.3, seed: ev[4], ev: !!ev[5] }); break;
+    }
+  }
+
+  function updateGuest(dt) {
+    const k = Math.min(1, (performance.now() - G.snapT) / 1000 / G.snapDt);
+    for (const e of G.enemies) {
+      e.x = e.px + (e.tx - e.px) * k; e.y = e.py + (e.ty - e.py) * k;
+      e.wob += dt * 6; e.flash -= dt;
+    }
+    for (const p of G.players) {
+      if (p.idx !== G.localIdx) { p.x = p.px + (p.tx - p.px) * k; p.y = p.py + (p.ty - p.py) * k; }
+      for (const w of p.weapons) if (w.id === 'orbe') w.angle += (w.evolved ? 4.2 : 3.2) * dt;
+    }
+    for (const b of G.bullets) { b.x += b.vx * dt; b.y += b.vy * dt; b.rot += dt * 18; }
+    for (const b of G.ebullets) { b.x += b.vx * dt; b.y += b.vy * dt; }
+    for (const q of G.pickups) q.t += dt;
+
+    const me = G.players[G.localIdx], other = G.players.find(q => q !== me);
+    if (state === 'play' && !me.down) {
+      const { dx, dy } = inputDir(G.localIdx);
+      const sp = 170 * me.stats.speed;
+      me.x += dx * sp * dt; me.y += dy * sp * dt;
+      if (other && !other.down) {
+        // La misma correa que aplica el anfitrión: no alejarse más que el ancho de la pantalla.
+        const [hw, hh] = G.leash;
+        me.x = Math.max(other.x - 2 * hw, Math.min(other.x + 2 * hw, me.x));
+        me.y = Math.max(other.y - 2 * hh, Math.min(other.y + 2 * hh, me.y));
+      }
+      if (dx || dy) {
+        const l = Math.hypot(dx, dy);
+        me.face = { x: dx / l, y: dy / l };
+        if (Math.abs(dx) > 0.1) me.side = Math.sign(dx);
+        me.walk += dt * 10;
+      }
+    }
+    const al = G.players.filter(p => !p.down);
+    if (al.length) {
+      G.cx = al.reduce((a, p) => a + p.x, 0) / al.length;
+      G.cy = al.reduce((a, p) => a + p.y, 0) / al.length;
+    }
+    G.sendT -= dt;
+    if (G.sendT <= 0) {
+      G.sendT = 1 / 30;
+      Net.send({ t: 'in', x: r1(me.x), y: r1(me.y), fx: r1(me.face.x), fy: r1(me.face.y), side: me.side, walk: r1(me.walk) });
+    }
+    updateFx(dt);
+    for (const a of [G.particles, G.texts, G.effects]) compact(a);
+    G.shake = Math.max(0, G.shake - dt * 30);
+    Sound.setMode(G.boss ? 'boss' : 'calm');
+  }
+
+  function guestChoose(i) {
+    Sound.play('click');
+    Net.send({ t: 'pick', i });
+    G.guestOpts = null;
+    showWaiting('Aplicando mejora…');
+  }
+
+  function guestEnd(m) {
+    state = m.win ? 'win' : 'over';
+    releaseJoys();
+    Sound.stopMusic();
+    Sound.play(m.win ? 'win' : 'lose');
+    const map = mapById(m.map);
+    const r = recordRun(m.win, m.time, map, m.base, 1 + 0.1 * upLvl('codicia'));
+    Object.assign(r, { t: m.time, level: m.level, kills: m.kills });
+    $('retryBtn').classList.add('hidden');
+    showEnd(m.win, m.win ? '¡Victoria!' : 'Habéis caído', '🌐 Online: ' + G.names.map(esc).join(' y ') + '<br>', r,
+      '<br><span id="endWait" class="sub">Esperando a que el anfitrión decida si jugáis otra vez…</span>');
+  }
+
+  // Mensajes recibidos del otro jugador.
+  Net.onMessage = m => {
+    if (m.t === 'hello') return onHello(m);
+    if (m.t === 'start') return startGuest(m);
+    if (!G) return;
+    if (G.online === 'guest') {
+      switch (m.t) {
+        case 's': applySnapshot(m); break;
+        case 'lvl':
+          state = 'levelup'; releaseJoys();
+          G.guestOpts = m.opts;
+          renderChoices('¡Subes de nivel! <span style="color:' + PCOLORS[G.localIdx] + '">Te toca elegir</span>', m.opts, pickIndex);
+          break;
+        case 'wait':
+          state = 'levelup'; releaseJoys();
+          showWaiting(`${esc(G.names[m.who])} está eligiendo su mejora…`, PCOLORS[m.who]);
+          break;
+        case 'go': if (state === 'levelup') { state = 'play'; showOnly(null); } break;
+        case 'paused': guestSetPaused(m.on); break;
+        case 'end': guestEnd(m); break;
+      }
+    } else if (G.online === 'host') {
+      switch (m.t) {
+        case 'in': G.remote = m; break;
+        case 'view': G.remoteVW = m.vw; G.remoteVH = m.vh; break;
+        case 'pausereq': togglePause(); break;
+        case 'pick':
+          if (state === 'levelup' && G.chooserP && G.chooserP.idx !== G.localIdx && G.opts[m.i]) choose(G.opts[m.i]);
+          break;
+      }
+    }
+  };
+
+  Net.onState = (st, info) => {
+    if (st === 'waiting') lobbyStatus('Comparte este código con tu compañero. Esperando a que se una…');
+    else if (st === 'connecting') lobbyStatus('Conectando…');
+    else if (st === 'open') {
+      Net.send(myHello());
+      lobbyStatus(lobby && lobby.role === 'host' ? 'Conectado. Preparando la sala…' : 'Conectado. Esperando al anfitrión…');
+    } else if (st === 'failed') {
+      lobbyStatus('No se ha podido conectar. Puede que vuestras redes bloqueen la conexión directa: probad con otra red (por ejemplo, datos móviles).', true);
+    } else if (st === 'error') {
+      lobbyStatus('Error con la sala: ' + Cloud.message(info) + ' (revisa las reglas de Firestore, ver README).', true);
+    } else if (st === 'closed') onDisconnect();
+  };
+
+  addEventListener('resize', () => { if (G && G.online === 'guest') Net.send({ t: 'view', vw: VW, vh: VH }); });
+
+  function myName() { return (Cloud.user && Cloud.user.name) || 'Jugador'; }
+  function myHello() { return { t: 'hello', name: myName(), char: S.char, up: S.up, vw: VW, vh: VH }; }
+
+  function lobbyStatus(text, err) {
+    const el = $('lobbyStatus');
+    el.textContent = text;
+    el.classList.toggle('err', !!err);
+  }
+  function renderLobby() {
+    const me = { name: myName(), char: S.char };
+    const host = lobby && lobby.role === 'host';
+    const rows = host ? [me, lobby.remote] : [lobby && lobby.remote, me];
+    $('lobbyPlayers').innerHTML = rows.map((r, i) =>
+      `<div class="lp" style="border-color:${PCOLORS[i]}"><b style="color:${PCOLORS[i]}">J${i + 1}${i === 0 ? ' · anfitrión' : ''}</b> ` +
+      (r ? `${esc(r.name)} — ${esc(charById(r.char).name)}` : '<span class="sub">esperando…</span>') + '</div>').join('');
+    $('lobbyStart').classList.toggle('hidden', !(host && lobby.remote && Net.open));
+  }
+
+  function onHello(m) {
+    if (!lobby) lobby = { role: Net.role, remote: null };
+    lobby.remote = { name: String(m.name || 'Jugador').slice(0, 40), char: m.char, up: m.up || {}, vw: +m.vw || 0, vh: +m.vh || 0 };
+    renderLobby();
+    if (lobby.role === 'host') {
+      lobbyStatus(`¡${lobby.remote.name} se ha unido! Pulsa «¡Comenzar!» cuando estéis listos.`);
+      if (state === 'over' || state === 'win') $('retryBtn').classList.remove('hidden');
+    } else lobbyStatus(`Conectado con ${lobby.remote.name}. Esperando a que empiece la partida…`);
+  }
+
+  async function hostRoom() {
+    lobby = { role: 'host', remote: null };
+    $('lobbyCode').classList.add('hidden');
+    lobbyStatus('Creando sala…');
+    renderLobby();
+    showOnly('lobby');
+    try {
+      const code = await Net.host(Cloud.rooms);
+      if (!code) return;
+      $('lobbyCode').textContent = code;
+      $('lobbyCode').classList.remove('hidden');
+    } catch (e) {
+      lobbyStatus('No se pudo crear la sala: ' + Cloud.message(e), true);
+    }
+  }
+
+  async function joinRoom() {
+    const code = $('joinCode').value.trim().toUpperCase();
+    if (!/^[A-Z0-9]{5}$/.test(code)) {
+      $('onlineMsg').textContent = 'Escribe el código de 5 caracteres de la sala.';
+      $('onlineMsg').classList.add('err');
+      Sound.play('error');
+      return;
+    }
+    lobby = { role: 'guest', remote: null };
+    $('lobbyCode').textContent = code;
+    $('lobbyCode').classList.remove('hidden');
+    lobbyStatus('Buscando la sala…');
+    renderLobby();
+    showOnly('lobby');
+    try { await Net.join(Cloud.rooms, code); }
+    catch (e) { lobbyStatus(Cloud.message(e), true); }
+  }
+
+  function hostStart() {
+    if (!Net.open || !lobby || !lobby.remote) return;
+    const r = lobby.remote;
+    const online = {
+      map: S.map, chars: [S.char, charById(r.char).id], ups: [S.up, r.up],
+      names: [myName(), r.name], vw: r.vw, vh: r.vh,
+    };
+    Sound.init();
+    newGame(online);
+    lastOnline = 'host';
+    Net.send({ t: 'start', map: online.map, chars: online.chars, names: online.names });
+    beginPlay();
+    toast(`🌐 Jugando con ${r.name}` + (isTouch ? ' · arrastra el dedo para moverte' : ''), true);
+  }
+
+  function onDisconnect() {
+    const playing = G && G.online && !['over', 'win'].includes(state);
+    if (playing && G.online === 'host') {
+      // Seguimos en solitario: se retira el personaje del invitado.
+      G.players = G.players.filter(p => p.idx === G.localIdx);
+      G.p = G.players[0];
+      G.online = null; G.coop = false;
+      toast('🔌 Tu compañero se ha desconectado. Sigues tú solo.');
+      if (state === 'levelup') { G.chooser = 0; openLevelUp(); }
+    } else if (playing && G.online === 'guest') {
+      state = 'over';
+      releaseJoys(); Sound.stopMusic(); Sound.resume();
+      $('endTitle').textContent = 'Conexión perdida';
+      $('endTitle').style.color = '#ff5c7a';
+      $('endStats').innerHTML = 'Se ha perdido la conexión con el anfitrión.';
+      $('retryBtn').classList.add('hidden');
+      $('pauseBtn').classList.add('hidden');
+      showOnly('end');
+    } else if (state === 'over' || state === 'win') {
+      const w = $('endWait');
+      if (w) w.textContent = 'El anfitrión ha salido de la partida.';
+      if (lastOnline === 'host') $('retryBtn').classList.remove('hidden');
+    } else if (lobby) {
+      lobbyStatus('Tu compañero se ha desconectado.', true);
+    }
+    if (lobby) { lobby.remote = null; if (!$('lobby').classList.contains('hidden')) renderLobby(); }
+    lastOnline = null;
+  }
+
+  function leaveOnline() {
+    Net.close();
+    lobby = null; lastOnline = null;
+  }
+
+  // ---------- Flujo de partida ----------
+  function beginPlay() {
     showOnly(null);
     $('pauseBtn').classList.remove('hidden');
+    $('retryBtn').classList.remove('hidden');
     $('toast').classList.add('hidden');
     state = 'play';
     Sound.startMusic();
-    if (G.coop) toast(isTouch ? 'J1: mitad izquierda · J2: mitad derecha' : 'J1: WASD · J2: flechas (o un mando cada uno)');
-    else if (isTouch) toast('Arrastra el dedo para moverte');
+  }
+
+  function start() {
+    Sound.init();
+    newGame();
+    beginPlay();
+    if (G.coop) toast(isTouch ? 'J1: mitad izquierda · J2: mitad derecha' : 'J1: WASD · J2: flechas (o un mando cada uno)', true);
+    else if (isTouch) toast('Arrastra el dedo para moverte', true);
+  }
+
+  // «Jugar otra vez»: en online, solo el anfitrión puede empezar la revancha.
+  function retry() {
+    if (lastOnline === 'guest') return;
+    if (lastOnline === 'host') { if (Net.open && lobby && lobby.remote) hostStart(); return; }
+    start();
   }
 
   function toMenu() {
+    if (Net.role) leaveOnline();
     G = null; state = 'menu';
     Sound.stopMusic(); Sound.resume();
     $('pauseBtn').classList.add('hidden');
+    $('retryBtn').classList.remove('hidden');
     $('toast').classList.add('hidden');
     openMenu();
   }
 
   function togglePause() {
+    if (G && G.online === 'guest') {
+      if (state === 'play' || state === 'paused') Net.send({ t: 'pausereq' });
+      return;
+    }
     if (state === 'play') {
       state = 'paused';
       releaseJoys();
       renderBuild(); syncToggles();
       showOnly('pause');
       Sound.suspend();
+      if (G && G.online === 'host') Net.send({ t: 'paused', on: true });
     } else if (state === 'paused') {
       state = 'play';
       Sound.resume();
       showOnly(null);
+      if (G && G.online === 'host') Net.send({ t: 'paused', on: false });
+    }
+  }
+  function guestSetPaused(on) {
+    if (on && state === 'play') {
+      state = 'paused'; releaseJoys(); renderBuild(); syncToggles(); showOnly('pause'); Sound.suspend();
+    } else if (!on && state === 'paused') {
+      state = 'play'; Sound.resume(); showOnly(null);
     }
   }
 
@@ -1727,6 +2179,31 @@
     $('build').innerHTML = h;
   }
 
+  // Guarda el resultado de una partida en el progreso de esta cuenta.
+  function recordRun(win, t, map, base, goldMult) {
+    const lockedBefore = MAPS.filter(m => !mapUnlocked(m)).map(m => m.id);
+    let record = false;
+    if (t > (S.best[map.id] || 0)) { S.best[map.id] = t; record = true; }
+    if (win) S.wins[map.id] = (S.wins[map.id] || 0) + 1;
+    const earned = Math.round(base * map.gold * goldMult);
+    S.gold += earned;
+    save();
+    return { earned, record, newMaps: MAPS.filter(m => lockedBefore.includes(m.id) && mapUnlocked(m)) };
+  }
+
+  function showEnd(win, title, info, r, extra) {
+    $('endTitle').textContent = title;
+    $('endTitle').style.color = win ? '#6fffb0' : '#ff5c7a';
+    $('endStats').innerHTML =
+      (win ? 'El Rey del Abismo ha sido derrotado.<br>' : '') + info +
+      `Tiempo: <b>${fmtTime(r.t)}</b>${r.record ? ' 🏆' : ''}<br>Nivel: <b>${r.level}</b> · Enemigos: <b>${r.kills}</b><br>` +
+      `Oro ganado: <b>🪙 ${r.earned}</b> (total ${S.gold})` +
+      r.newMaps.map(m => `<br><span class="unlock">¡Nuevo mapa desbloqueado: ${m.emoji} ${m.name}!</span>`).join('') +
+      (extra || '');
+    $('pauseBtn').classList.add('hidden');
+    showOnly('end');
+  }
+
   function endGame(win) {
     if (state === 'over' || state === 'win') return;
     state = win ? 'win' : 'over';
@@ -1734,26 +2211,13 @@
     Sound.stopMusic();
     Sound.play(win ? 'win' : 'lose');
     const t = G.time, map = G.map;
-    const lockedBefore = MAPS.filter(m => !mapUnlocked(m)).map(m => m.id);
-    let record = false;
-    if (t > (S.best[map.id] || 0)) { S.best[map.id] = t; record = true; }
-    if (win) S.wins[map.id] = (S.wins[map.id] || 0) + 1;
     const base = G.gold + Math.floor(t / 10) + G.bossKills * 50 + (win ? 150 : 0);
-    const earned = Math.round(base * map.gold * G.players[0].stats.gold);
-    S.gold += earned;
-    save();
-    const newMaps = MAPS.filter(m => lockedBefore.includes(m.id) && mapUnlocked(m));
-
-    $('endTitle').textContent = win ? '¡Victoria!' : (G.coop ? 'Habéis caído' : 'Has caído');
-    $('endTitle').style.color = win ? '#6fffb0' : '#ff5c7a';
-    $('endStats').innerHTML =
-      (win ? 'El Rey del Abismo ha sido derrotado.<br>' : '') +
-      (G.coop ? '👥 Cooperativo: ' + G.players.map(p => esc(p.ch.name)).join(' y ') + '<br>' : '') +
-      `Tiempo: <b>${fmtTime(t)}</b>${record ? ' 🏆' : ''}<br>Nivel: <b>${G.level}</b> · Enemigos: <b>${G.kills}</b><br>` +
-      `Oro ganado: <b>🪙 ${earned}</b> (total ${S.gold})` +
-      newMaps.map(m => `<br><span class="unlock">¡Nuevo mapa desbloqueado: ${m.emoji} ${m.name}!</span>`).join('');
-    $('pauseBtn').classList.add('hidden');
-    showOnly('end');
+    const r = recordRun(win, t, map, base, G.players[0].stats.gold);
+    if (G.online === 'host') Net.send({ t: 'end', win, time: t, level: G.level, kills: G.kills, base, map: map.id });
+    Object.assign(r, { t, level: G.level, kills: G.kills });
+    const who = G.online ? '🌐 Online: ' + G.names.map(esc).join(' y ') + '<br>'
+      : G.coop ? '👥 Cooperativo: ' + G.players.map(p => esc(p.ch.name)).join(' y ') + '<br>' : '';
+    showEnd(win, win ? '¡Victoria!' : (G.coop ? 'Habéis caído' : 'Has caído'), who, r);
   }
 
   // Botones
@@ -1763,11 +2227,18 @@
   click('helpBtn', () => showOnly('help'));
   document.querySelectorAll('#modeRow button').forEach(b => b.addEventListener('click', () => {
     Sound.init(); Sound.play('click');
-    S.coop = b.dataset.m === '2'; save(); renderSelect();
+    S.mode = b.dataset.m; save(); renderSelect();
   }));
   click('accountBtn', () => { setMsg(''); renderAccount(); showOnly('account'); });
   click('startBtn', start);
-  click('retryBtn', start);
+  click('retryBtn', retry);
+  click('hostBtn', hostRoom);
+  click('joinBtn', joinRoom);
+  $('joinCode').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('joinBtn').click(); } });
+  $('joinCode').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
+  click('onlineLoginBtn', () => { setMsg(''); renderAccount(); showOnly('account'); });
+  click('lobbyStart', hostStart);
+  click('lobbyCancel', () => { leaveOnline(); renderSelect(); showOnly('select'); });
   click('menuBtn', toMenu);
   click('quitBtn', toMenu);
   $('resumeBtn').addEventListener('click', togglePause);
@@ -1787,7 +2258,13 @@
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     pollPads();
-    if (state === 'play') update(dt);
+    if (G && G.online === 'guest') {
+      if (state !== 'paused' && state !== 'over' && state !== 'win') updateGuest(dt);
+    } else if (state === 'play') update(dt);
+    if (G && G.online === 'host' && state !== 'over' && state !== 'win') {
+      G.netT -= dt;
+      if (G.netT <= 0) { G.netT = 1 / 15; Net.send(makeSnapshot()); }
+    }
     render(dt);
     requestAnimationFrame(frame);
   }
