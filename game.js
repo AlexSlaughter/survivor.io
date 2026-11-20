@@ -78,7 +78,7 @@
   function newGame() {
     const ch = charById(S.char), map = mapById(S.map), m = ch.mods;
     const p = {
-      x: 0, y: 0, r: 14, hp: 100, maxHp: 100, inv: 0, face: { x: 1, y: 0 }, walk: 0, ch,
+      x: 0, y: 0, r: 14, hp: 100, maxHp: 100, inv: 0, face: { x: 1, y: 0 }, side: 1, walk: 0, ch,
       level: 1, xp: 0, xpNext: 5, kills: 0,
       stats: { dmg: 1, cd: 1, speed: 1, regen: 0, magnet: 1, area: 1, proj: 0, armor: 0, xp: 1, gold: 1 },
       weapons: [], passives: {},
@@ -100,7 +100,7 @@
 
     G = {
       time: 0, spawnAcc: 0, nextElite: 60, nextSwarm: 45, bossIdx: 0, shake: 0, pending: 0,
-      boss: null, opts: [], map, gold: 0, bossKills: 0,
+      boss: null, opts: [], map, gold: 0, coins: 0, bossKills: 0,
       revives: upLvl('renacer'), choices: 3 + upLvl('vision'),
       p, enemies: [], bullets: [], ebullets: [], gems: [], pickups: [], particles: [], texts: [], effects: [],
     };
@@ -123,7 +123,7 @@
       const i = ['Digit1', 'Digit2', 'Digit3', 'Digit4'].indexOf(e.code);
       if (i >= 0 && G.opts[i]) choose(G.opts[i]);
     }
-    if ((state === 'over' || state === 'win') && e.code === 'Enter') start();
+    if ((state === 'over' || state === 'win') && e.code === 'Enter' && !(e.target instanceof HTMLButtonElement)) start();
   });
   addEventListener('keyup', e => { keys[e.code] = false; });
   addEventListener('blur', () => { for (const k in keys) keys[k] = false; joy.active = false; });
@@ -222,12 +222,14 @@
   }
 
   // ---------- Combate ----------
-  function hurt(e, dmg, kx = 0, ky = 0, kb = 0) {
+  function hurt(e, dmg, kx = 0, ky = 0, kb = 0, quiet = false) {
     if (e.dead) return;
     e.hp -= dmg; e.flash = 0.08;
     if (kb && !e.boss) { const f = e.elite ? 0.3 : 1; e.kx += kx * kb * f; e.ky += ky * kb * f; }
-    addText(e.x + rand(-6, 6), e.y - e.r, Math.round(dmg), dmg >= 60 ? '#ffcf4d' : '#ffffff');
-    Sound.play('hit', 0.05);
+    if (!quiet) {
+      addText(e.x + rand(-6, 6), e.y - e.r, Math.round(dmg), dmg >= 60 ? '#ffcf4d' : '#ffffff');
+      Sound.play('hit', 0.05);
+    }
     if (e.hp <= 0) kill(e);
   }
 
@@ -242,13 +244,25 @@
       const r = Math.random();
       if (r < 0.010) G.pickups.push({ type: 'carne', x: e.x, y: e.y, t: 0 });
       else if (r < 0.014) G.pickups.push({ type: 'iman', x: e.x, y: e.y, t: 0 });
-      else if (r < 0.05) G.pickups.push({ type: 'moneda', x: e.x, y: e.y, t: 0, mag: false, sp: 0 });
+      else if (r < 0.05) dropCoin(e.x, e.y);
     }
     if (e.boss) {
-      G.boss = null; G.shake = 14; G.bossKills++;
+      // Si quedaba otro jefe vivo, su barra sigue en pantalla.
+      if (G.boss === e) G.boss = G.enemies.find(o => o.boss && !o.dead) || null;
+      G.shake = 14; G.bossKills++;
       if (e.final) endGame(true);
       else toast(`¡Has derrotado a ${e.name}!`);
     }
+  }
+
+  // Limita las monedas en el suelo: si hay demasiadas, suma su valor a una existente.
+  function dropCoin(x, y) {
+    if (G.coins >= 120) {
+      const c = G.pickups.find(k => k.type === 'moneda' && !k.dead);
+      if (c) { c.v++; return; }
+    }
+    G.coins++;
+    G.pickups.push({ type: 'moneda', x, y, t: 0, mag: false, sp: 0, v: 1 });
   }
 
   function dropGem(x, y, v) {
@@ -280,7 +294,7 @@
       if (G.revives > 0) {
         G.revives--;
         p.hp = p.maxHp * 0.5; p.inv = 2.5;
-        query(p.x, p.y, 260, e => { if (!e.boss) hurt(e, 99999); });
+        query(p.x, p.y, 260, e => { if (!e.boss) hurt(e, 99999, 0, 0, 0, true); });
         for (const b of G.ebullets) b.dead = true;
         burst(p.x, p.y, '#fff7c2', 60, 320);
         G.shake = 12;
@@ -542,7 +556,7 @@
       const n = 16 + Math.floor(t / 30);
       const type = t > 240 ? 'espectro' : 'murcielago';
       const d = Math.hypot(VW, VH) / 2 + 40;
-      for (let i = 0; i < n; i++) {
+      for (let i = 0; i < n && G.enemies.length < MAX_ENEMIES; i++) {
         const a = i / n * TAU;
         spawnEnemy(type, { pos: [G.p.x + Math.cos(a) * d, G.p.y + Math.sin(a) * d] });
       }
@@ -558,6 +572,7 @@
     if (dx || dy) {
       const l = Math.hypot(dx, dy);
       p.face = { x: dx / l, y: dy / l };
+      if (Math.abs(dx) > 0.1) p.side = Math.sign(dx);
       p.walk += dt * 10;
     }
     p.inv -= dt;
@@ -687,7 +702,7 @@
         Sound.play('chest');
         toast('🧲 ¡Todos los cristales vienen a ti!');
       } else if (k.type === 'cofre') openChest();
-      else if (k.type === 'moneda') { G.gold++; Sound.play('coin', 0.05); }
+      else if (k.type === 'moneda') { G.gold += k.v; G.coins--; Sound.play('coin', 0.05); }
     }
   }
 
@@ -897,9 +912,12 @@
       case 'helm':
         ctx.beginPath(); ctx.arc(x, cy - 1, r + 1.5, Math.PI, 0); ctx.fill();
         ctx.fillStyle = '#c9d1e0'; ctx.fillRect(x - 1.5, cy - r - 6, 3, 7); break;
-      case 'band':
+      case 'band': {
+        // La cola de la cinta va hacia atrás según el último lado al que se miró.
+        const sd = face.side || (face.x >= 0 ? 1 : -1);
         ctx.fillRect(x - r, cy - r * 0.55, r * 2, r * 0.3);
-        ctx.beginPath(); ctx.moveTo(x - face.x * r, cy - r * 0.45); ctx.lineTo(x - face.x * (r + 9), cy - r * 0.1); ctx.lineTo(x - face.x * (r + 7), cy - r * 0.7); ctx.fill(); break;
+        ctx.beginPath(); ctx.moveTo(x - sd * r, cy - r * 0.45); ctx.lineTo(x - sd * (r + 9), cy - r * 0.1); ctx.lineTo(x - sd * (r + 7), cy - r * 0.7); ctx.fill(); break;
+      }
       case 'flame': {
         ctx.beginPath(); ctx.arc(x, cy - 2, r + 1, Math.PI * 1.1, Math.PI * 1.9); ctx.fill();
         const fl = Math.sin(performance.now() / 90) * 2;
@@ -920,7 +938,7 @@
     const p = G.p;
     if (p.inv > 0 && Math.floor(p.inv * 20) % 2 === 0) ctx.globalAlpha = 0.45;
     shadow(p.x, p.y, p.r);
-    drawHero(p.x, p.y, p.r, p.ch, p.face, Math.sin(p.walk) * 1.5);
+    drawHero(p.x, p.y, p.r, p.ch, { x: p.face.x, y: p.face.y, side: p.side }, Math.sin(p.walk) * 1.5);
     ctx.globalAlpha = 1;
     const bw = 36;
     ctx.fillStyle = '#2a0d18'; ctx.fillRect(p.x - bw / 2, p.y + p.r + 8, bw, 5);
@@ -1180,7 +1198,8 @@
     });
   }
   document.querySelectorAll('.tgl').forEach(b => b.addEventListener('click', () => {
-    Sound.init();
+    // En pausa el audio está suspendido: no reactivarlo al cambiar los ajustes.
+    if (state !== 'paused') Sound.init();
     if (b.dataset.t === 'sfx') { S.sfx = !S.sfx; Sound.setSfx(S.sfx); }
     else { S.music = !S.music; Sound.setMusic(S.music); }
     save(); syncToggles(); Sound.play('click');
@@ -1371,7 +1390,12 @@
   $('resumeBtn').addEventListener('click', togglePause);
   $('pauseBtn').addEventListener('click', togglePause);
   document.querySelectorAll('.back').forEach(b => b.addEventListener('click', () => { Sound.play('click'); openMenu(); }));
-  document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'play') togglePause(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (state === 'play') togglePause();
+      else if (state === 'levelup') Sound.suspend();
+    } else if (state === 'levelup') Sound.resume();
+  });
   openMenu();
 
   // ---------- Bucle principal ----------
