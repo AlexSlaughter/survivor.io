@@ -60,6 +60,26 @@ window.HN_DATA = {
       name: 'Lanzacohetes', icon: '🚀', desc: 'Cohetes que explotan y dañan en área.',
       up: ['Más daño y cadencia', 'Explosión más grande', '+1 cohete', 'Más daño y explosión más grande'],
     },
+    espada_pixel: {
+      name: 'Espada de Steve', icon: '⚔️', desc: 'Tajos rápidos al frente con un 20% de golpe crítico (daño doble).',
+      up: ['Más daño y rapidez', 'Más alcance', 'Más daño y rapidez', 'Más alcance'],
+    },
+    shuriken: {
+      name: 'Shurikens de Naruto', icon: '✴️', desc: 'Abanico de estrellas ninja que atraviesan a dos enemigos.',
+      up: ['Más daño y cadencia', '+1 shuriken', 'Más daño y cadencia', '+1 shuriken'],
+    },
+    escudo: {
+      name: 'Escudo del Capitán América', icon: '🛡️', desc: 'Escudo que se lanza, atraviesa todo y vuelve a tu mano.',
+      up: ['Más daño', 'Más daño y cadencia', '+1 escudo', 'Más daño y cadencia'],
+    },
+    martillo: {
+      name: 'Martillo de Mordekaiser', icon: '🔨', desc: 'Golpe al suelo que daña y aparta a todo lo que te rodea.',
+      up: ['Más daño y rapidez', 'Más radio', 'Más daño y rapidez', 'Más radio'],
+    },
+    onda_ki: {
+      name: 'Kamehameha', icon: '🔆', desc: 'Gran onda de energía que atraviesa toda la pantalla.',
+      up: ['Más daño y cadencia', 'Rayo más ancho', 'Más daño y cadencia', 'Rayo más ancho'],
+    },
   },
 
   PASSIVES: {
@@ -142,16 +162,40 @@ window.HN_DATA = {
       colors: { slime: '#7fe0ff', murcielago: '#b0c4ff', espectro: '#e6f7ff', bruto: '#5a7dff' },
       hp: 1.8, speed: 1.12, gold: 2.2, unlock: { map: 'desierto', time: 420 },
     },
+    {
+      id: 'bloques', name: 'Mundo de Minecraft', emoji: '⛏️', desc: 'Todo está hecho de cubos, y los enemigos parecen creepers y zombis.',
+      bg: '#0b100d', grid: '#152019', accent: '#2f6b3a', decor: ['block', 'grassblock', 'ore'],
+      colors: { slime: '#6fdc7a', murcielago: '#9a86e8', espectro: '#c7d3e6', bruto: '#58b06a' },
+      hp: 1.15, speed: 1.0, gold: 1.25, unlock: { map: 'bosque', time: 180 },
+    },
+    {
+      id: 'aldea', name: 'Aldea de Konoha', emoji: '🍃', desc: 'La aldea oculta de la Hoja, de Naruto.',
+      bg: '#0c120f', grid: '#18241c', accent: '#b5652a', decor: ['leaf', 'kunai', 'spiral'],
+      colors: { slime: '#ffb072', murcielago: '#7f8cff', espectro: '#bfe3f0', bruto: '#d98a6a' },
+      hp: 1.3, speed: 1.08, gold: 1.45, unlock: { map: 'bloques', time: 300 },
+    },
+    {
+      id: 'champi', name: 'Reino Champiñón', emoji: '🍄', desc: 'Tuberías, champiñones y bloques con interrogante, como en Super Mario.',
+      bg: '#0b0f22', grid: '#171e3e', accent: '#a83a5a', decor: ['pipe', 'mushroom', 'qblock'],
+      colors: { slime: '#d39a6a', murcielago: '#ff7a9a', espectro: '#eef0ff', bruto: '#6fdc7a' },
+      hp: 1.5, speed: 1.08, gold: 1.7, unlock: { map: 'aldea', time: 300 },
+    },
+    {
+      id: 'grieta', name: 'Grieta del Invocador', emoji: '🔮', desc: 'El campo de batalla de League of Legends.',
+      bg: '#0a1116', grid: '#14242b', accent: '#1f8fa0', decor: ['rune', 'crystal', 'brush'],
+      colors: { slime: '#6fd6ff', murcielago: '#c08cff', espectro: '#9ff0ee', bruto: '#ff7a6b' },
+      hp: 2.0, speed: 1.12, gold: 2.6, unlock: { map: 'cripta', time: 300 },
+    },
   ],
 
   // ---------- Equipo ----------
   // Cada objeto da bonificaciones (valor a nivel 1); suben un 50% del valor base por nivel hasta el 5.
   // Las armas equipadas sustituyen al arma inicial del personaje.
   RARITY: {
-    comun:      { name: 'Común',      color: '#b9c0d8', price: 150,  w: 50 },
-    raro:       { name: 'Raro',       color: '#4da3ff', price: 400,  w: 30 },
-    epico:      { name: 'Épico',      color: '#c06bff', price: 900,  w: 15 },
-    legendario: { name: 'Legendario', color: '#ffc23d', price: 2000, w: 5 },
+    comun:      { name: 'Común',      color: '#9aa3c7', price: 150,  w: 50 },
+    raro:       { name: 'Raro',       color: '#5ad1ff', price: 400,  w: 30 },
+    epico:      { name: 'Épico',      color: '#b48cff', price: 900,  w: 15 },
+    legendario: { name: 'Legendario', color: '#ffd75e', price: 2000, w: 5 },
   },
   EQUIP_SLOTS: [
     { id: 'arma',    name: 'Arma',    icon: '⚔️' },
@@ -162,28 +206,45 @@ window.HN_DATA = {
   ],
   ITEMS: [
     // Armas principales (sustituyen al ataque básico)
-    { id: 'revolver',      slot: 'arma', rarity: 'comun',      icon: '🤠', name: 'Revólver',      weapon: 'revolver',      stats: { dmg: 0.03 } },
-    { id: 'escopeta',      slot: 'arma', rarity: 'raro',       icon: '💥', name: 'Escopeta',      weapon: 'escopeta',      stats: { hp: 10 } },
-    { id: 'subfusil',      slot: 'arma', rarity: 'raro',       icon: '🎇', name: 'Subfusil',      weapon: 'subfusil',      stats: { speed: 0.03 } },
-    { id: 'katana',        slot: 'arma', rarity: 'epico',      icon: '🗡️', name: 'Katana',        weapon: 'katana',        stats: { speed: 0.05 } },
-    { id: 'francotirador', slot: 'arma', rarity: 'epico',      icon: '🔭', name: 'Francotirador', weapon: 'francotirador', stats: { xp: 0.05 } },
-    { id: 'lanzacohetes',  slot: 'arma', rarity: 'legendario', icon: '🚀', name: 'Lanzacohetes',  weapon: 'lanzacohetes',  stats: { dmg: 0.05 } },
+    { id: 'revolver',      slot: 'arma', rarity: 'comun',      icon: '🤠', name: 'Revólver',      weapon: 'revolver',      stats: { dmg: 0.05 } },
+    { id: 'escopeta',      slot: 'arma', rarity: 'raro',       icon: '💥', name: 'Escopeta',      weapon: 'escopeta',      stats: { hp: 20 } },
+    { id: 'subfusil',      slot: 'arma', rarity: 'raro',       icon: '🎇', name: 'Subfusil',      weapon: 'subfusil',      stats: { speed: 0.08, hp: 8 } },
+    { id: 'katana',        slot: 'arma', rarity: 'epico',      icon: '🗡️', name: 'Katana',        weapon: 'katana',        stats: { speed: 0.10, dmg: 0.08 } },
+    { id: 'francotirador', slot: 'arma', rarity: 'epico',      icon: '🔭', name: 'Francotirador', weapon: 'francotirador', stats: { xp: 0.15, dmg: 0.08 } },
+    { id: 'lanzacohetes',  slot: 'arma', rarity: 'legendario', icon: '🚀', name: 'Lanzacohetes',  weapon: 'lanzacohetes',  stats: { dmg: 0.15, area: 0.18 } },
+    { id: 'espada_pixel',  slot: 'arma', rarity: 'raro',       icon: '⚔️', name: 'Espada de Steve',             weapon: 'espada_pixel', stats: { hp: 10, dmg: 0.05 },               ref: 'Minecraft' },
+    { id: 'shuriken',      slot: 'arma', rarity: 'raro',       icon: '✴️', name: 'Shurikens de Naruto',         weapon: 'shuriken',     stats: { speed: 0.08, dmg: 0.04 },          ref: 'Naruto' },
+    { id: 'escudo',        slot: 'arma', rarity: 'epico',      icon: '🛡️', name: 'Escudo del Capitán América',  weapon: 'escudo',       stats: { armor: 1, hp: 20 },             ref: 'Capitán América' },
+    { id: 'martillo',      slot: 'arma', rarity: 'epico',      icon: '🔨', name: 'Martillo de Mordekaiser',     weapon: 'martillo',    stats: { hp: 20, area: 0.12 },               ref: 'Mordekaiser (League of Legends)' },
+    { id: 'onda_ki',       slot: 'arma', rarity: 'legendario', icon: '🔆', name: 'Kamehameha de Goku',          weapon: 'onda_ki',      stats: { dmg: 0.15, xp: 0.18 },  ref: 'Dragon Ball' },
     // Cascos
     { id: 'capucha',  slot: 'casco', rarity: 'comun',      icon: '🧢', name: 'Capucha de Viaje', stats: { hp: 10 } },
-    { id: 'yelmo',    slot: 'casco', rarity: 'raro',       icon: '⛑️', name: 'Yelmo de Hierro',  stats: { armor: 1, hp: 5 } },
-    { id: 'corona',   slot: 'casco', rarity: 'legendario', icon: '👑', name: 'Corona del Sabio', stats: { xp: 0.10, hp: 15 } },
+    { id: 'yelmo',    slot: 'casco', rarity: 'raro',       icon: '⛑️', name: 'Yelmo de Hierro',  stats: { armor: 1, hp: 8 } },
+    { id: 'corona',   slot: 'casco', rarity: 'legendario', icon: '👑', name: 'Corona del Sabio', stats: { xp: 0.20, hp: 18, dmg: 0.05 } },
+    { id: 'gorra_fontanero', slot: 'casco', rarity: 'comun',  icon: '🧢', name: 'Gorra de Mario',           stats: { hp: 6, gold: 0.05 },   ref: 'Super Mario' },
+    { id: 'bandana_ninja',   slot: 'casco', rarity: 'raro',   icon: '🥷', name: 'Bandana de Naruto',    stats: { speed: 0.07, dmg: 0.05 }, ref: 'Naruto' },
+    { id: 'sombrero_paja',   slot: 'casco', rarity: 'epico',  icon: '👒', name: 'Sombrero de Paja de Luffy',              stats: { hp: 18, regen: 0.5, gold: 0.05 }, ref: 'One Piece' },
     // Pecho
-    { id: 'tunica',        slot: 'pecho', rarity: 'comun', icon: '👕', name: 'Túnica Reforzada', stats: { hp: 15 } },
-    { id: 'cota',          slot: 'pecho', rarity: 'raro',  icon: '🥋', name: 'Cota de Malla',    stats: { hp: 20, armor: 1 } },
-    { id: 'manto_estelar', slot: 'pecho', rarity: 'epico', icon: '🧥', name: 'Manto Estelar',    stats: { hp: 25, regen: 0.5 } },
+    { id: 'tunica',        slot: 'pecho', rarity: 'comun', icon: '👕', name: 'Túnica Reforzada', stats: { hp: 11 } },
+    { id: 'cota',          slot: 'pecho', rarity: 'raro',  icon: '🥋', name: 'Cota de Malla',    stats: { hp: 8, armor: 1 } },
+    { id: 'manto_estelar', slot: 'pecho', rarity: 'epico', icon: '🧥', name: 'Manto Estelar',    stats: { hp: 22, regen: 0.5 } },
+    { id: 'tunica_heroe',  slot: 'pecho', rarity: 'raro',       icon: '🧝', name: 'Túnica de Link',  stats: { hp: 14, speed: 0.04 }, ref: 'The Legend of Zelda' },
+    { id: 'gi_naranja',    slot: 'pecho', rarity: 'epico',      icon: '🟠', name: 'Gi de Goku', stats: { hp: 20, dmg: 0.06 }, ref: 'Dragon Ball' },
+    { id: 'armadura_vibranio', slot: 'pecho', rarity: 'legendario', icon: '🦾', name: 'Armadura de Iron Man', stats: { hp: 20, armor: 1.5, dmg: 0.05 }, ref: 'Iron Man' },
     // Botas
-    { id: 'sandalias',    slot: 'botas', rarity: 'comun', icon: '🩴', name: 'Sandalias Ligeras', stats: { speed: 0.05 } },
-    { id: 'botas_viento', slot: 'botas', rarity: 'raro',  icon: '👢', name: 'Botas del Viento',  stats: { speed: 0.06, magnet: 0.10 } },
-    { id: 'botas_fase',   slot: 'botas', rarity: 'epico', icon: '👟', name: 'Botas de Fase',     stats: { speed: 0.10, armor: 1 } },
+    { id: 'sandalias',    slot: 'botas', rarity: 'comun', icon: '🩴', name: 'Sandalias Ligeras', stats: { speed: 0.07 } },
+    { id: 'botas_viento', slot: 'botas', rarity: 'raro',  icon: '👢', name: 'Botas del Viento',  stats: { speed: 0.10, magnet: 0.15 } },
+    { id: 'botas_fase',   slot: 'botas', rarity: 'epico', icon: '👟', name: 'Botas de Fase',     stats: { speed: 0.12, armor: 1, hp: 3 } },
+    { id: 'zapas_azules', slot: 'botas', rarity: 'epico',      icon: '💨', name: 'Zapatillas de Sonic', stats: { speed: 0.21 },             ref: 'Sonic' },
+    { id: 'botas_del_10', slot: 'botas', rarity: 'legendario', icon: '⚽', name: 'Botas de Leo Messi',            stats: { speed: 0.14, dmg: 0.08, gold: 0.15 }, ref: 'Leo Messi' },
     // Amuletos
-    { id: 'colgante',   slot: 'amuleto', rarity: 'comun',      icon: '📿', name: 'Colgante de la Suerte', stats: { gold: 0.10 } },
-    { id: 'ojo_dragon', slot: 'amuleto', rarity: 'epico',      icon: '🧿', name: 'Ojo de Dragón',         stats: { dmg: 0.08 } },
-    { id: 'reliquia',   slot: 'amuleto', rarity: 'legendario', icon: '💠', name: 'Reliquia Antigua',      stats: { dmg: 0.08, area: 0.10, gold: 0.10 } },
+    { id: 'colgante',   slot: 'amuleto', rarity: 'comun',      icon: '📿', name: 'Colgante de la Suerte', stats: { gold: 0.13 } },
+    { id: 'ojo_dragon', slot: 'amuleto', rarity: 'epico',      icon: '🧿', name: 'Ojo de Dragón',         stats: { dmg: 0.16 } },
+    { id: 'reliquia',   slot: 'amuleto', rarity: 'legendario', icon: '💠', name: 'Reliquia Antigua',      stats: { dmg: 0.12, area: 0.12, gold: 0.12 } },
+    { id: 'champinon',     slot: 'amuleto', rarity: 'comun',      icon: '🍄', name: 'Superchampiñón de Mario',  stats: { hp: 10 },                       ref: 'Super Mario' },
+    { id: 'esfera_dragon', slot: 'amuleto', rarity: 'epico',      icon: '🔮', name: 'Bola de Dragón de 4 Estrellas', stats: { xp: 0.20, gold: 0.15 },     ref: 'Dragon Ball' },
+    { id: 'anillo_unico',  slot: 'amuleto', rarity: 'legendario', icon: '💍', name: 'El Anillo Único',    stats: { dmg: 0.20, area: 0.12, cd: 0.03, hp: -10 }, ref: 'El Señor de los Anillos' },
+    { id: 'trifuerza',     slot: 'amuleto', rarity: 'legendario', icon: '🔺', name: 'Trifuerza',   stats: { dmg: 0.10, speed: 0.10, xp: 0.13 }, ref: 'The Legend of Zelda' },
   ],
   // Cómo se muestra cada bonificación.
   STAT_LABELS: {

@@ -52,7 +52,12 @@ Todos empiezan con la **🔫 Pistola** (ataque básico). El arma que te equipes 
 | 💥 Escopeta | Raro | Perdigones a corta distancia que empujan | 38 |
 | 🔭 Francotirador | Épico | Disparo lento que atraviesa a todos y apunta a los más duros | 71 |
 | 🗡️ Katana | Épico | Tajo en arco a los enemigos cercanos | 72 |
+| ⚔️ Espada de Steve (Minecraft) | Raro | Tajos rápidos al frente, 20% de crítico | 43 |
+| ✴️ Shurikens de Naruto | Raro | Abanico de estrellas que atraviesan | 42 |
+| 🛡️ Escudo del Capitán América | Épico | Se lanza, atraviesa y vuelve | 68 |
+| 🔨 Martillo de Mordekaiser | Épico | Golpe al suelo que daña y aparta alrededor | 80 |
 | 🚀 Lanzacohetes | Legendario | Cohetes que explotan en área | 125 |
+| 🔆 Kamehameha de Goku | Legendario | Gran onda de energía que atraviesa la pantalla | 138 |
 
 ### Habilidades (al subir de nivel)
 
@@ -113,11 +118,15 @@ En **🎒 Equipo** tienes 5 huecos: **arma**, **casco**, **pecho**, **botas** y 
 
 | Hueco | Objetos |
 |---|---|
-| ⚔️ Arma | Revólver, Escopeta, Subfusil, Katana, Francotirador, Lanzacohetes |
-| 🪖 Casco | Capucha de Viaje, Yelmo de Hierro, Corona del Sabio |
-| 🦺 Pecho | Túnica Reforzada, Cota de Malla, Manto Estelar |
-| 🥾 Botas | Sandalias Ligeras, Botas del Viento, Botas de Fase |
-| 📿 Amuleto | Colgante de la Suerte, Ojo de Dragón, Reliquia Antigua |
+| ⚔️ Arma | Revólver, Escopeta, Subfusil, Espada de Steve, Shurikens de Naruto, Katana, Francotirador, Escudo del Capitán América, Martillo de Mordekaiser, Lanzacohetes, Kamehameha de Goku |
+| 🪖 Casco | Capucha de Viaje, Gorra de Mario, Yelmo de Hierro, Bandana de Naruto, Sombrero de Paja de Luffy, Corona del Sabio |
+| 🦺 Pecho | Túnica Reforzada, Cota de Malla, Túnica de Link, Manto Estelar, Gi de Goku, Armadura de Iron Man |
+| 🥾 Botas | Sandalias Ligeras, Botas del Viento, Botas de Fase, Zapatillas de Sonic, Botas de Leo Messi |
+| 📿 Amuleto | Colgante de la Suerte, Superchampiñón de Mario, Ojo de Dragón, Bola de Dragón de 4 Estrellas, Reliquia Antigua, El Anillo Único, Trifuerza |
+
+**Más beneficios, más rareza:** cada bonificación vale unos puntos (por ejemplo, 10 de vida = 10 puntos; +5% de daño = 10 puntos) y cada rareza tiene su presupuesto: común ~10, raro ~20, épico ~32 y legendario ~48. Con las armas pasa igual con el daño que hacen.
+
+En **📖 Catálogo** puedes ver todos los objetos, también los que aún no tienes, con sus bonificaciones y en qué cofres salen.
 
 ### Mapas
 
@@ -126,6 +135,10 @@ En **🎒 Equipo** tienes 5 huecos: **arma**, **casco**, **pecho**, **botas** y 
 | 🌲 Bosque Sombrío | Normal | ×1 | Disponible desde el principio |
 | 🏜️ Desierto Carmesí | +35% vida enemiga, más rápidos | ×1.5 | Sobrevive 5:00 en el Bosque |
 | ❄️ Cripta Helada | +80% vida enemiga, más rápidos | ×2.2 | Sobrevive 7:00 en el Desierto |
+| ⛏️ Mundo de Minecraft | +15% vida enemiga | ×1.25 | Sobrevive 3:00 en el Bosque |
+| 🍃 Aldea de Konoha | +30% vida enemiga, más rápidos | ×1.45 | Sobrevive 5:00 en Minecraft |
+| 🍄 Reino Champiñón | +50% vida enemiga, más rápidos | ×1.7 | Sobrevive 5:00 en Konoha |
+| 🔮 Grieta del Invocador | +100% vida enemiga, más rápidos | ×2.6 | Sobrevive 5:00 en la Cripta |
 
 ### Tienda
 

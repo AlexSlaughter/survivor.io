@@ -583,7 +583,7 @@
   function shootBala(p, a, o) {
     G.bullets.push({
       kind: 'bala', x: p.x, y: p.y, vx: Math.cos(a) * o.spd, vy: Math.sin(a) * o.spd, r: o.r || 4,
-      dmg: o.dmg, life: o.life, pierce: o.pierce || 0, hit: new Set(), color: o.color, kb: o.kb ?? 100,
+      dmg: o.dmg, life: o.life, pierce: o.pierce || 0, hit: new Set(), color: o.color, kb: o.kb ?? 100, shape: o.shape,
     });
   }
   function explode(b) {
@@ -694,6 +694,87 @@
         G.bullets.push({ kind: 'cohete', x: p.x, y: p.y, vx: Math.cos(a) * 380, vy: Math.sin(a) * 380, r: 6, dmg: 34 * mainMul(w) * s.dmg, R, life: 2.2 });
       }
       sfx('launch', 0.1);
+    },
+    espada_pixel(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      const R = (85 + (w.lvl >= 3 ? 12 : 0) + (w.lvl >= 5 ? 12 : 0)) * s.area;
+      const t = nearest(p.x, p.y, 1, R + 20)[0];
+      if (!t) { w.t = 0.1; return; }
+      w.t = (0.55 - 0.03 * (w.lvl - 1)) * s.cd;
+      const arcs = 1 + s.proj, arc = 1.6, base = aimAt(p, t), dmg = 7.5 * mainMul(w) * s.dmg;
+      for (let k = 0; k < arcs; k++) {
+        const a = base + k * TAU / arcs;
+        query(p.x, p.y, R, e => {
+          let da = Math.atan2(e.y - p.y, e.x - p.x) - a;
+          da = Math.atan2(Math.sin(da), Math.cos(da));
+          if (Math.abs(da) > arc / 2) return;
+          const kx = e.x - p.x, ky = e.y - p.y, l = Math.hypot(kx, ky) || 1;
+          hurt(e, Math.random() < 0.2 ? dmg * 2 : dmg, kx / l, ky / l, 180);  // 20% crítico
+        });
+        G.effects.push({ type: 'slash', x: p.x, y: p.y, a, R, arc, life: 0.18, max: 0.18, color: '#7fe8ff' });
+        netOut(['k', Math.round(p.x), Math.round(p.y), r1(a), Math.round(R), arc, '#7fe8ff']);
+      }
+      sfx('slash', 0.1);
+    },
+    shuriken(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      const t = nearest(p.x, p.y, 1, 480)[0];
+      if (!t) { w.t = 0.15; return; }
+      w.t = (0.95 - 0.05 * (w.lvl - 1)) * s.cd;
+      const n = 3 + (w.lvl >= 3 ? 1 : 0) + (w.lvl >= 5 ? 1 : 0) + s.proj, a = aimAt(p, t);
+      for (let i = 0; i < n; i++) shootBala(p, a + spreadA(i, n, 0.18), { spd: 470, r: 6, dmg: 7 * mainMul(w) * s.dmg, life: 1.1, pierce: 2, color: '#cfd8dc', kb: 80, shape: 'star' });
+      sfx('slash', 0.1);
+    },
+    escudo(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      const t = nearest(p.x, p.y, 1, 450)[0];
+      if (!t) { w.t = 0.15; return; }
+      w.t = (1.3 - 0.06 * (w.lvl - 1)) * s.cd;
+      const n = 1 + (w.lvl >= 4 ? 1 : 0) + s.proj, base = aimAt(p, t);
+      for (let i = 0; i < n; i++) {
+        const a = base + spreadA(i, n, 0.5);
+        G.bullets.push({
+          kind: 'disco', skin: 'shield', ev: false, owner: p, x: p.x, y: p.y, vx: Math.cos(a), vy: Math.sin(a), spd: 560,
+          t: 0, out: 0.55, r: 15 * Math.sqrt(s.area), dmg: 45 * mainMul(w) * s.dmg, hits: new Map(), life: 5, rot: 0,
+        });
+      }
+      sfx('disc', 0.1);
+    },
+    martillo(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      const R = (105 + (w.lvl >= 3 ? 15 : 0) + (w.lvl >= 5 ? 15 : 0)) * s.area;
+      if (!nearest(p.x, p.y, 1, R)[0]) { w.t = 0.1; return; }
+      w.t = (1.55 - 0.07 * (w.lvl - 1)) * s.cd;
+      const dmg = 16 * mainMul(w) * s.dmg;
+      for (let k = 0; k <= s.proj; k++) {
+        // Con proyectiles extra golpea otra vez un instante después.
+        setTimeout(() => {
+          if (!G || p.down) return;
+          query(p.x, p.y, R, e => {
+            const kx = e.x - p.x, ky = e.y - p.y, l = Math.hypot(kx, ky) || 1;
+            hurt(e, dmg, kx / l, ky / l, 320);
+          });
+          G.effects.push({ type: 'ring', x: p.x, y: p.y, R, life: 0.4, max: 0.4 });
+          netOut(['r', Math.round(p.x), Math.round(p.y), Math.round(R)]);
+          G.shake = Math.max(G.shake, 5);
+          sfx('boom', 0.05);
+        }, k * 180);
+      }
+    },
+    onda_ki(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      const t = nearest(p.x, p.y, 1, 650)[0];
+      if (!t) { w.t = 0.2; return; }
+      w.t = (1.5 - 0.06 * (w.lvl - 1)) * s.cd;
+      const n = 1 + s.proj, a = aimAt(p, t), r = (15 + (w.lvl >= 3 ? 4 : 0) + (w.lvl >= 5 ? 4 : 0)) * Math.sqrt(s.area);
+      for (let i = 0; i < n; i++) shootBala(p, a + spreadA(i, n, 0.25), { spd: 600, r, dmg: 160 * mainMul(w) * s.dmg, life: 1.4, pierce: 99, color: '#7fdbff', kb: 200, shape: 'ki' });
+      G.shake = Math.max(G.shake, 3);
+      sfx('sniper', 0.1);
     },
   };
 
@@ -1276,6 +1357,70 @@
       case 'tomb':
         ctx.fillStyle = '#16263a'; rr(x - 8, y - 16, 16, 20, 7); ctx.fill();
         ctx.fillStyle = '#22385a'; ctx.fillRect(x - 1, y - 12, 2, 8); ctx.fillRect(x - 4, y - 9, 8, 2); break;
+      // Mundo de Minecraft (de noche): cubos apagados y mineral que brilla un poco
+      case 'block':
+        ctx.fillStyle = 'rgba(93,64,55,.35)'; ctx.fillRect(x - 10, y - 10, 20, 20);
+        ctx.fillStyle = 'rgba(120,85,72,.3)'; ctx.fillRect(x - 10, y - 10, 10, 10); ctx.fillRect(x, y, 10, 10);
+        break;
+      case 'grassblock':
+        ctx.fillStyle = 'rgba(93,64,55,.35)'; ctx.fillRect(x - 10, y - 10, 20, 20);
+        ctx.fillStyle = 'rgba(76,175,80,.35)'; ctx.fillRect(x - 10, y - 10, 20, 6);
+        ctx.fillRect(x - 6, y - 4, 3, 3); ctx.fillRect(x + 3, y - 4, 3, 4);
+        break;
+      case 'ore':
+        ctx.fillStyle = 'rgba(97,97,110,.35)'; ctx.fillRect(x - 10, y - 10, 20, 20);
+        ctx.shadowColor = '#4dd0e1'; ctx.shadowBlur = 8;
+        ctx.fillStyle = 'rgba(77,208,225,.7)'; ctx.fillRect(x - 6, y - 5, 3, 3); ctx.fillRect(x + 2, y + 1, 3, 3); ctx.fillRect(x - 3, y + 4, 3, 3);
+        ctx.shadowBlur = 0;
+        break;
+      // Aldea de Konoha (de noche)
+      case 'leaf':
+        ctx.fillStyle = 'rgba(102,187,106,.22)';
+        ctx.beginPath(); ctx.ellipse(x, y, 9, 4, 0.6, 0, TAU); ctx.fill();
+        ctx.strokeStyle = 'rgba(102,187,106,.3)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x - 7, y - 5); ctx.lineTo(x + 7, y + 5); ctx.stroke();
+        break;
+      case 'kunai':
+        ctx.save(); ctx.translate(x, y); ctx.rotate(0.8); ctx.globalAlpha = 0.45;
+        ctx.fillStyle = '#90a4ae'; ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(4, -2); ctx.lineTo(-4, -2); ctx.fill();
+        ctx.fillStyle = '#455a64'; ctx.fillRect(-1.5, -2, 3, 9);
+        ctx.strokeStyle = '#90a4ae'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 9, 2.5, 0, TAU); ctx.stroke();
+        ctx.restore();
+        break;
+      case 'spiral':
+        ctx.strokeStyle = 'rgba(255,160,90,.22)'; ctx.lineWidth = 2; ctx.beginPath();
+        for (let i = 0; i < 30; i++) { const a = i * 0.45, rr2 = 1 + i * 0.4; ctx.lineTo(x + Math.cos(a) * rr2, y + Math.sin(a) * rr2); }
+        ctx.stroke();
+        break;
+      // Reino Champiñón (de noche): siluetas suaves y un leve brillo en los bloques "?"
+      case 'pipe':
+        ctx.fillStyle = 'rgba(46,125,50,.35)'; ctx.fillRect(x - 9, y - 12, 18, 18);
+        ctx.fillStyle = 'rgba(67,160,71,.4)'; ctx.fillRect(x - 12, y - 18, 24, 7);
+        ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(x - 6, y - 12, 3, 18);
+        break;
+      case 'mushroom':
+        ctx.fillStyle = 'rgba(245,230,200,.35)'; ctx.fillRect(x - 3, y - 4, 6, 8);
+        ctx.fillStyle = 'rgba(255,122,154,.45)'; ctx.beginPath(); ctx.arc(x, y - 4, 8, Math.PI, 0); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.beginPath(); ctx.arc(x - 3, y - 8, 1.8, 0, TAU); ctx.arc(x + 4, y - 6, 1.5, 0, TAU); ctx.fill();
+        break;
+      case 'qblock':
+        ctx.shadowColor = '#ffc23d'; ctx.shadowBlur = 10;
+        ctx.fillStyle = 'rgba(255,194,61,.28)'; ctx.fillRect(x - 9, y - 9, 18, 18);
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = 'rgba(255,194,61,.45)'; ctx.lineWidth = 1.5; ctx.strokeRect(x - 9, y - 9, 18, 18);
+        ctx.fillStyle = 'rgba(255,226,150,.65)'; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('?', x, y + 1);
+        break;
+      // Grieta del Invocador
+      case 'rune':
+        ctx.strokeStyle = 'rgba(38,198,218,.3)'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(x, y, 9, 0, TAU); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, y - 9); ctx.lineTo(x + 6, y + 5); ctx.lineTo(x - 6, y + 5); ctx.closePath(); ctx.stroke();
+        break;
+      case 'brush':
+        ctx.fillStyle = 'rgba(56,142,60,.25)';
+        for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.ellipse(x - 8 + i * 4, y, 2.5, 8, (i - 2) * 0.2, 0, TAU); ctx.fill(); }
+        break;
       case 'snow':
         ctx.fillStyle = 'rgba(220, 240, 255, .14)'; ctx.beginPath();
         ctx.arc(x, y, 2, 0, TAU); ctx.arc(x + 9, y + 3, 1.5, 0, TAU); ctx.arc(x + 3, y + 9, 2.5, 0, TAU); ctx.fill(); break;
@@ -1581,7 +1726,33 @@
   function drawBullets() {
     for (const b of G.bullets) {
       if (!inView(b.x, b.y, 40)) continue;
-      if (b.kind === 'bala') {
+      if (b.kind === 'bala' && b.shape === 'star') {
+        ctx.save();
+        ctx.translate(b.x, b.y); ctx.rotate(performance.now() / 50);
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) { const rr2 = i % 2 ? b.r * 0.4 : b.r * 1.5, a = i / 8 * TAU; ctx.lineTo(Math.cos(a) * rr2, Math.sin(a) * rr2); }
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#37474f'; ctx.beginPath(); ctx.arc(0, 0, b.r * 0.3, 0, TAU); ctx.fill();
+        ctx.restore();
+      } else if (b.kind === 'bala' && b.shape === 'ki') {
+        const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r * 1.6);
+        g.addColorStop(0, '#ffffff'); g.addColorStop(0.45, b.color); g.addColorStop(1, 'rgba(127,219,255,0)');
+        ctx.strokeStyle = 'rgba(127,219,255,.35)'; ctx.lineWidth = b.r * 1.4; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx * 0.12, b.y - b.vy * 0.12); ctx.stroke();
+        ctx.lineCap = 'butt';
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 1.6, 0, TAU); ctx.fill();
+      } else if (b.kind === 'disco' && b.skin === 'shield') {
+        ctx.save();
+        ctx.translate(b.x, b.y); ctx.rotate(b.rot);
+        const rs = [[1, '#c62828'], [0.75, '#f5f5f5'], [0.52, '#c62828'], [0.34, '#1565c0']];
+        for (const [k, c] of rs) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(0, 0, b.r * k, 0, TAU); ctx.fill(); }
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) { const rr2 = i % 2 ? b.r * 0.13 : b.r * 0.32, a = -Math.PI / 2 + i / 10 * TAU; ctx.lineTo(Math.cos(a) * rr2, Math.sin(a) * rr2); }
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+      } else if (b.kind === 'bala') {
         // Trazadora: estela del color del arma y punta blanca.
         ctx.strokeStyle = b.color; ctx.lineWidth = b.r; ctx.lineCap = 'round'; ctx.globalAlpha = 0.75;
         ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx * 0.025, b.y - b.vy * 0.025); ctx.stroke();
@@ -1632,11 +1803,21 @@
       if (f.type === 'slash') {
         const k = f.life / f.max;
         ctx.globalAlpha = k;
-        ctx.strokeStyle = '#eef6ff'; ctx.lineWidth = 3 + 7 * k; ctx.lineCap = 'round';
+        ctx.strokeStyle = f.color || '#eef6ff'; ctx.lineWidth = 3 + 7 * k; ctx.lineCap = 'round';
         ctx.beginPath(); ctx.arc(f.x, f.y, f.R * (0.75 + 0.25 * (1 - k)), f.a - f.arc / 2, f.a + f.arc / 2); ctx.stroke();
         ctx.strokeStyle = '#9dd6ff'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(f.x, f.y, f.R * (0.55 + 0.25 * (1 - k)), f.a - f.arc / 2.6, f.a + f.arc / 2.6); ctx.stroke();
         ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+        continue;
+      }
+      if (f.type === 'ring') {
+        const k = f.life / f.max, R = f.R * (1.05 - 0.6 * k);
+        ctx.globalAlpha = k;
+        ctx.strokeStyle = '#b0bec5'; ctx.lineWidth = 10 * k + 2;
+        ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, TAU); ctx.stroke();
+        ctx.fillStyle = 'rgba(120,130,150,.18)';
+        ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, TAU); ctx.fill();
+        ctx.globalAlpha = 1;
         continue;
       }
       if (f.type === 'boom') {
@@ -1998,7 +2179,12 @@
     box.innerHTML = '';
     if (eqTab === 'chests') { renderChests(box); return; }
     const order = it => EQUIP_SLOTS.findIndex(sl => sl.id === it.slot) * 10 + Object.keys(RARITY).indexOf(it.rarity);
-    const list = ITEMS.filter(it => !!S.items[it.id]).sort((a, b) => order(a) - order(b));
+    const catalog = eqTab === 'catalog';
+    const list = ITEMS.filter(it => catalog || !!S.items[it.id]).sort((a, b) => order(a) - order(b));
+    if (catalog) {
+      const owned = ITEMS.filter(it => S.items[it.id]).length;
+      box.innerHTML = `<p class="sub" style="grid-column:1/-1">Todos los objetos del juego. Tienes <b>${owned}/${ITEMS.length}</b>. Los que no tienes salen en los 🎰 Cofres o como botín de los jefes.</p>`;
+    }
     if (!list.length) {
       box.innerHTML = '<p class="sub">Aún no tienes objetos. Ábrelos en los 🎰 Cofres o derrota jefes para conseguir botín.</p>';
     }
@@ -2007,12 +2193,23 @@
       const on = S.equip[it.slot] === it.id;
       const d = document.createElement('div');
       d.className = 'sel item' + (on ? ' equipped' : '');
-      d.style.borderColor = rar.color;
+      d.style.setProperty('--rc', rar.color);
       d.innerHTML =
-        `<div class="ic" style="font-size:30px">${it.icon}</div><div class="nm" style="color:${rar.color}">${it.name}</div>` +
-        `<div class="rar" style="color:${rar.color}">${rar.name} · ${slot.name}${lvl ? ` · Nv. ${lvl}` : ''}</div>` +
+        `<div class="ic" style="font-size:30px">${it.icon}</div><div class="nm">${it.name}</div>` +
+        `<div class="rar"><span class="badge">${rar.name}</span> ${slot.name}${lvl ? ` · Nv. ${lvl}` : ''}</div>` +
+        (it.ref ? `<div class="ref">🎮 ${it.ref}</div>` : '') +
         (it.weapon ? `<div class="wp">Ataque principal: ${WEAPONS[it.weapon].desc}</div>` : '') +
         `<div class="st">${fmtStats(it.stats, Math.max(1, lvl))}</div>`;
+      if (catalog) {
+        // Catálogo: solo información, también de lo que aún no tienes.
+        const chests = 'Sale en ' + CHESTS.filter(c => c.rates[it.rarity] > 0).map(c => c.icon).join(' ') + ' y como botín';
+        if (!lvl) d.classList.add('missing');
+        d.insertAdjacentHTML('beforeend', lvl
+          ? `<div class="own">✔ Lo tienes · Nv. ${lvl}${on ? ' · equipado' : ''}</div>`
+          : `<div class="own no">🔒 ${chests}</div>`);
+        box.appendChild(d);
+        continue;
+      }
       const btns = document.createElement('div');
       btns.className = 'btns';
       const mk = (text, cls, fn) => { const b = document.createElement('button'); b.textContent = text; if (cls) b.className = cls; b.addEventListener('click', fn); btns.appendChild(b); return b; };
@@ -2044,7 +2241,7 @@
     col.className = 'collection';
     col.style.gridColumn = '1 / -1';
     col.innerHTML = `Colección: <b>${owned}/${ITEMS.length}</b> objetos` +
-      `<div class="icons">${ITEMS.map(it => `<span class="${S.items[it.id] ? '' : 'no'}" style="border-color:${RARITY[it.rarity].color}" title="${S.items[it.id] ? it.name : '???'}">${it.icon}</span>`).join('')}</div>`;
+      `<div class="icons">${ITEMS.map(it => `<span class="${S.items[it.id] ? '' : 'no'}" style="border-color:${RARITY[it.rarity].color}" title="${it.name}">${it.icon}</span>`).join('')}</div>`;
     box.appendChild(col);
     for (const ch of CHESTS) {
       const d = document.createElement('div');
@@ -2155,6 +2352,7 @@
       : `Ya estaba al máximo: recibes 🪙 ${res.gold}`;
     $('rouResult').innerHTML = `<div class="big">${it.icon}</div><div class="rn" style="color:${rar.color}">${it.name}</div>` +
       `<div class="rs"><b style="color:${rar.color}">${rar.name}</b> · ${status}</div>` +
+      (it.ref ? `<div class="rs ref">🎮 ${it.ref}</div>` : '') +
       `<div class="rs">${fmtStats(it.stats, Math.max(1, S.items[it.id] || 1))}${it.weapon ? `<br>Ataque principal: ${WEAPONS[it.weapon].desc}` : ''}</div>`;
     Sound.play(it.rarity === 'legendario' || it.rarity === 'epico' ? 'evolve' : 'chest');
     $('rouAgain').disabled = false;
@@ -2343,8 +2541,8 @@
     for (const b of G.bullets) {
       if (b.dead || !near(b)) continue;
       const k = BULLET_IDX[b.kind];
-      snap.bu.push(k === 1 ? [1, R(b.x), R(b.y), 0, 0, r1(b.r), b.ev ? 1 : 0, r1(b.rot)]
-        : [k, R(b.x), R(b.y), R(b.vx), R(b.vy), r1(b.r), b.ev ? 1 : 0, 0, b.color || 0]);
+      snap.bu.push(k === 1 ? [1, R(b.x), R(b.y), 0, 0, r1(b.r), b.ev ? 1 : 0, r1(b.rot), 0, b.skin || 0]
+        : [k, R(b.x), R(b.y), R(b.vx), R(b.vy), r1(b.r), b.ev ? 1 : 0, 0, b.color || 0, b.shape || 0]);
     }
     for (const b of G.ebullets) if (!b.dead && near(b)) snap.eb.push([R(b.x), R(b.y), R(b.vx), R(b.vy), b.r, b.color]);
     for (const g of G.gems) if (!g.dead && near(g)) snap.gm.push(g.v === 1 ? [R(g.x), R(g.y)] : [R(g.x), R(g.y), g.v]);
@@ -2416,7 +2614,7 @@
     }
     for (const id of [...G.emap.keys()]) if (!seen.has(id)) G.emap.delete(id);
     G.enemies = list;
-    G.bullets = sn.bu.map(v => ({ kind: BULLET_IDS[v[0]], x: v[1], y: v[2], vx: v[3], vy: v[4], r: v[5], ev: !!v[6], rot: v[7], color: v[8] || '#fff' }));
+    G.bullets = sn.bu.map(v => ({ kind: BULLET_IDS[v[0]], x: v[1], y: v[2], vx: v[3], vy: v[4], r: v[5], ev: !!v[6], rot: v[7], color: v[8] || '#fff', shape: v[9] || null, skin: v[9] || null }));
     G.ebullets = sn.eb.map(v => ({ x: v[0], y: v[1], vx: v[2], vy: v[3], r: v[4], color: v[5] }));
     G.gems = sn.gm.map(v => ({ x: v[0], y: v[1], v: v[2] || 1 }));
     G.pickups = sn.pk.map(v => ({ type: PICK_IDS[v[0]], x: v[1], y: v[2], t: v[3] }));
@@ -2430,7 +2628,8 @@
       case 'b': burst(ev[1], ev[2], ev[3], ev[4], ev[5]); break;
       case 'm': toast(ev[1]); break;
       case 'z': G.effects.push({ type: 'bolt', x: ev[1], y: ev[2], R: ev[3], life: 0.3, max: 0.3, seed: ev[4], ev: !!ev[5] }); break;
-      case 'k': G.effects.push({ type: 'slash', x: ev[1], y: ev[2], a: ev[3], R: ev[4], arc: ev[5], life: 0.22, max: 0.22 }); break;
+      case 'k': G.effects.push({ type: 'slash', x: ev[1], y: ev[2], a: ev[3], R: ev[4], arc: ev[5], color: ev[6], life: 0.22, max: 0.22 }); break;
+      case 'r': G.effects.push({ type: 'ring', x: ev[1], y: ev[2], R: ev[3], life: 0.4, max: 0.4 }); break;
       case 'x': G.effects.push({ type: 'boom', x: ev[1], y: ev[2], R: ev[3], life: 0.35, max: 0.35 }); break;
     }
   }
