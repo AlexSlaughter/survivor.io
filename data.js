@@ -23,7 +23,7 @@ window.HN_DATA = {
       evo: 'reloj', evoName: 'Juicio Tronante',
     },
     disco: {
-      name: 'Disco Retornante', icon: '🥏', desc: 'Un disco que va y vuelve atravesándolo todo.',
+      name: 'Disco Retornante', icon: '🥏', desc: 'Un disco que va hacia el enemigo más cercano y vuelve atravesándolo todo.',
       up: ['Más daño', '+1 disco', 'Más daño y recarga más rápida', '+1 disco'],
       evo: 'poder', evoName: 'Eclipse Giratorio',
     },
@@ -33,7 +33,7 @@ window.HN_DATA = {
       evo: 'botas', evoName: 'Tormenta de Acero',
     },
     latigo: {
-      name: 'Látigo de Espinas', icon: '🪢', desc: 'Azota en línea a los enemigos de tu lado.',
+      name: 'Látigo de Espinas', icon: '🪢', desc: 'Azota en línea hacia el enemigo más cercano.',
       up: ['Más daño y alcance', 'Azota también hacia atrás', 'Más daño y rapidez', 'Más daño y alcance'],
       evo: 'coraza', evoName: 'Látigo Vampírico',
     },
@@ -129,11 +129,34 @@ window.HN_DATA = {
       ranged: { range: 250, cd: 2.8, spd: 165, dmg: 9, n: 1, spread: 0, color: '#c8ff6a' } },
     brujo:      { hp: 48, speed: 46,  dmg: 10, r: 15, xp: 4, color: '#c47bff',
       ranged: { range: 300, cd: 3.4, spd: 150, dmg: 12, n: 3, spread: 0.28, color: '#e3a6ff' } },
+    // Rápida y en zigzag, pero muy frágil.
+    arana:      { hp: 9,  speed: 118, dmg: 6,  r: 10, xp: 1, color: '#cfd2e0', zigzag: true },
+    // Se para, avisa (brilla en rojo) y embiste en línea recta: apártate de su camino.
+    lobo:       { hp: 34, speed: 66,  dmg: 13, r: 14, xp: 3, color: '#a9b3c9',
+      charge: { range: 270, cd: 3.6, wind: 0.65, speed: 440, time: 0.55 } },
+    // Corre hacia ti y, al llegar, parpadea y explota: aléjate antes de que estalle.
+    calabaza:   { hp: 22, speed: 84,  dmg: 4,  r: 13, xp: 2, color: '#ff9a3c',
+      bomb: { range: 48, fuse: 0.9, R: 72, dmg: 20 } },
+    // Lento, enorme y muy resistente; casi no se le puede empujar.
+    golem:      { hp: 260, speed: 30, dmg: 24, r: 24, xp: 10, color: '#9b97ad', heavy: true },
+    // Se queda lejos e invoca arañas cada pocos segundos: ve a por él.
+    invocador:  { hp: 80, speed: 44,  dmg: 10, r: 15, xp: 6, color: '#5fe0c0',
+      summon: { range: 290, cd: 6, n: 3, type: 'arana' } },
   },
 
+  // Qué enemigos aparecen y desde qué segundo (con su peso en el sorteo).
+  SPAWNS: [
+    ['slime', 0, 3], ['murcielago', 40, 2], ['escupidor', 70, 1], ['arana', 95, 2], ['espectro', 130, 2],
+    ['lobo', 160, 1], ['calabaza', 190, 1], ['bruto', 220, 1], ['brujo', 250, 1], ['golem', 330, 1], ['invocador', 360, 1],
+  ],
+
+  // ai: 'ring' (anillos de proyectiles), 'summon' (invoca crías y lanza telarañas que ralentizan),
+  // 'charge' (embiste tras avisar y escupe fuego en abanico), 'king' (anillos y ráfagas dirigidas).
   BOSSES: [
-    { at: 300, name: 'Coloso de Obsidiana', hp: 5000, r: 38, speed: 52, dmg: 25, color: '#8a5cff', shots: 12, final: false },
-    { at: 600, name: 'Rey del Abismo',      hp: 20000, r: 48, speed: 60, dmg: 35, color: '#ff3d7f', shots: 18, final: true },
+    { at: 150, name: 'Reina Araña',         hp: 1200,  r: 32, speed: 68, dmg: 18, color: '#cfd2e0', shots: 8,  ai: 'summon', final: false },
+    { at: 300, name: 'Coloso de Obsidiana', hp: 5000,  r: 38, speed: 52, dmg: 25, color: '#8a5cff', shots: 12, ai: 'ring',   final: false },
+    { at: 450, name: 'Dragón de Hueso',     hp: 10000, r: 42, speed: 56, dmg: 30, color: '#ff9a3d', shots: 7,  ai: 'charge', final: false },
+    { at: 600, name: 'Rey del Abismo',      hp: 20000, r: 48, speed: 60, dmg: 35, color: '#ff3d7f', shots: 18, ai: 'king',   final: true },
   ],
 
   // Los personajes solo cambian estadísticas: el ataque principal lo da el arma equipada.
