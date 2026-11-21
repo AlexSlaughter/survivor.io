@@ -46,18 +46,24 @@ Todos empiezan con la **🔫 Pistola** (ataque básico). El arma que te equipes 
 
 | Arma | Rareza | Cómo ataca | Daño/s a una horda cercana (Nv1) |
 |---|---|---|---|
-| 🔫 Pistola | Básica | Dispara al enemigo más cercano | 15 |
-| 🤠 Revólver | Común | Balas pesadas que atraviesan a un enemigo | 23 |
-| 🎇 Subfusil | Raro | Lluvia de balas rápidas con dispersión | 30 |
+| 🔫 Pistola | Básica | Dispara al enemigo más cercano | 16 |
+| 🤠 Revólver | Común | Balas pesadas que atraviesan a un enemigo | 24 |
+| 🎇 Subfusil | Raro | Lluvia de balas rápidas con dispersión | 37 |
 | 💥 Escopeta | Raro | Perdigones a corta distancia que empujan | 38 |
-| 🔭 Francotirador | Épico | Disparo lento que atraviesa a todos y apunta a los más duros | 71 |
-| 🗡️ Katana | Épico | Tajo en arco a los enemigos cercanos | 72 |
 | ⚔️ Espada de Steve (Minecraft) | Raro | Tajos rápidos al frente, 20% de crítico | 43 |
 | ✴️ Shurikens de Naruto | Raro | Abanico de estrellas que atraviesan | 42 |
+| 👊 Puño Gomu Gomu de Luffy (One Piece) | Raro | El brazo se estira y golpea todo en línea recta | 40 |
+| ⚽ Balón del Mundial (Fútbol) | Raro | Chut que atraviesa a tres enemigos y los aparta | 42 |
+| 🔭 Francotirador | Épico | Disparo lento que atraviesa a todos y apunta a los más duros | 65 |
+| 🗡️ Katana | Épico | Tajo en arco a los enemigos cercanos | 64 |
+| 🌊 Katana Nichirin de Tanjiro (Demon Slayer) | Épico | Tajo de agua muy amplio y rápido | 65 |
 | 🛡️ Escudo del Capitán América | Épico | Se lanza, atraviesa y vuelve | 68 |
-| 🔨 Martillo de Mordekaiser | Épico | Golpe al suelo que daña y aparta alrededor | 80 |
-| 🚀 Lanzacohetes | Legendario | Cohetes que explotan en área | 125 |
-| 🔆 Kamehameha de Goku | Legendario | Gran onda de energía que atraviesa la pantalla | 138 |
+| 🔨 Martillo de Mordekaiser | Épico | Golpe al suelo que daña y aparta alrededor | 65 |
+| 🚀 Lanzacohetes | Legendario | Cohetes que explotan en área | 92 |
+| 🔆 Kamehameha de Goku | Legendario | Gran onda de energía que atraviesa la pantalla | 90 |
+| 🖤 Destello Negro de Itadori (Jujutsu Kaisen) | Legendario | Golpe a tu alrededor; 1 de cada 4 hace x2,5 | 90 |
+
+Los objetos están equilibrados por rareza: cada uno reparte sus bonificaciones de forma distinta, pero todos los de la misma rareza valen más o menos lo mismo.
 
 ### Habilidades (al subir de nivel)
 
@@ -118,11 +124,11 @@ En **🎒 Equipo** tienes 5 huecos: **arma**, **casco**, **pecho**, **botas** y 
 
 | Hueco | Objetos |
 |---|---|
-| ⚔️ Arma | Revólver, Escopeta, Subfusil, Espada de Steve, Shurikens de Naruto, Katana, Francotirador, Escudo del Capitán América, Martillo de Mordekaiser, Lanzacohetes, Kamehameha de Goku |
-| 🪖 Casco | Capucha de Viaje, Gorra de Mario, Yelmo de Hierro, Bandana de Naruto, Sombrero de Paja de Luffy, Corona del Sabio |
-| 🦺 Pecho | Túnica Reforzada, Cota de Malla, Túnica de Link, Manto Estelar, Gi de Goku, Armadura de Iron Man |
-| 🥾 Botas | Sandalias Ligeras, Botas del Viento, Botas de Fase, Zapatillas de Sonic, Botas de Leo Messi |
-| 📿 Amuleto | Colgante de la Suerte, Superchampiñón de Mario, Ojo de Dragón, Bola de Dragón de 4 Estrellas, Reliquia Antigua, El Anillo Único, Trifuerza |
+| ⚔️ Arma | Revólver, Escopeta, Subfusil, Espada de Steve, Shurikens de Naruto, Puño Gomu Gomu, Balón del Mundial, Katana, Katana Nichirin, Francotirador, Escudo del Capitán América, Martillo de Mordekaiser, Lanzacohetes, Kamehameha de Goku, Destello Negro |
+| 🪖 Casco | Capucha de Viaje, Gorra de Mario, Yelmo de Hierro, Bandana de Naruto, Sombrero de Paja de Luffy, Corona del Sabio, Gorro de Chopper, Máscara de Jabalí de Inosuke, Sombrero de Rabadon, Venda de Gojo |
+| 🦺 Pecho | Túnica Reforzada, Cota de Malla, Túnica de Link, Manto Estelar, Gi de Goku, Armadura de Iron Man, Camiseta del 10, Uniforme del Colegio Jujutsu, Haori de Tanjiro, Malla de Espinas, Capa de Almirante |
+| 🥾 Botas | Sandalias Ligeras, Botas del Viento, Botas de Fase, Zapatillas de Sonic, Botas de Leo Messi, Tacos de FIFA, Botas de Mercurio, Sandalias de Zenitsu, Bota de Oro |
+| 📿 Amuleto | Colgante de la Suerte, Superchampiñón de Mario, Ojo de Dragón, Bola de Dragón de 4 Estrellas, Reliquia Antigua, El Anillo Único, Trifuerza, Pendientes Hanafuda, Poké Ball, Filo Infinito, Fruta Gomu Gomu, Llavero de la Llave Espada, Dedo de Sukuna, Balón de Oro, Varita de Saúco |
 
 **Más beneficios, más rareza:** cada bonificación vale unos puntos (por ejemplo, 10 de vida = 10 puntos; +5% de daño = 10 puntos) y cada rareza tiene su presupuesto: común ~10, raro ~20, épico ~32 y legendario ~48. Con las armas pasa igual con el daño que hacen.
 
@@ -139,6 +145,10 @@ En **📖 Catálogo** puedes ver todos los objetos, también los que aún no tie
 | 🍃 Aldea de Konoha | +30% vida enemiga, más rápidos | ×1.45 | Sobrevive 5:00 en Minecraft |
 | 🍄 Reino Champiñón | +50% vida enemiga, más rápidos | ×1.7 | Sobrevive 5:00 en Konoha |
 | 🔮 Grieta del Invocador | +100% vida enemiga, más rápidos | ×2.6 | Sobrevive 5:00 en la Cripta |
+| 🧛 Castillo Vampiro | +60% vida enemiga, más rápidos | ×1.9 | Sobrevive 5:00 en la Cripta |
+| 🐙 Abismo Marino | +75% vida enemiga | ×2.1 | Sobrevive 5:00 en el Castillo |
+| 🌋 Volcán Infernal | +120% vida enemiga, más rápidos | ×2.9 | Sobrevive 5:00 en la Grieta |
+| 🚀 Base Lunar | +150% vida enemiga, mucho más rápidos | ×3.3 | Sobrevive 7:00 en el Volcán |
 
 ### Tienda
 
