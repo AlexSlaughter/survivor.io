@@ -3768,6 +3768,35 @@
 
   // ---------- Equipo y cofres ----------
   let eqTab = 'inv', eqReturn = 'menu';
+  // Filtros del catálogo y de "Mis objetos" (se recuerdan mientras la página está abierta).
+  const eqFilter = { rarity: 'all', slot: 'all', own: 'all' };
+  function filterBar(catalog, shown, total) {
+    const bar = document.createElement('div');
+    bar.className = 'filters';
+    const row = (label, key, opts) => {
+      const r = document.createElement('div');
+      r.className = 'frow';
+      r.innerHTML = `<span class="flabel">${label}</span>`;
+      for (const [val, text, color] of opts) {
+        const b = document.createElement('button');
+        b.className = 'chip' + (eqFilter[key] === val ? ' on' : '');
+        if (color) b.style.setProperty('--rc', color);
+        b.innerHTML = (color ? '<i class="dot"></i>' : '') + text;
+        b.setAttribute('aria-pressed', eqFilter[key] === val);
+        b.addEventListener('click', () => { eqFilter[key] = val; Sound.play('click'); renderEquip(); });
+        r.appendChild(b);
+      }
+      bar.appendChild(r);
+    };
+    row('Rareza', 'rarity', [['all', 'Todas'], ...Object.entries(RARITY).map(([k, r]) => [k, r.name, r.color])]);
+    row('Tipo', 'slot', [['all', 'Todos'], ...EQUIP_SLOTS.map(sl => [sl.id, `${sl.icon} ${sl.name}`])]);
+    if (catalog) row('Colección', 'own', [['all', 'Todos'], ['have', '✔ Los tengo'], ['miss', '🔒 Me faltan']]);
+    const n = document.createElement('p');
+    n.className = 'fcount';
+    n.textContent = shown === total ? `${total} objetos` : `Mostrando ${shown} de ${total} objetos`;
+    bar.appendChild(n);
+    return bar;
+  }
   const upCost = (it, lvl) => Math.round(RARITY[it.rarity].price * 0.4 * lvl);
   function fmtStats(stats, lvl) {
     return Object.keys(stats).map(k => `${STAT_LABELS[k][1](itemValue(stats[k], lvl))} ${STAT_LABELS[k][0]}`).join(' · ');
@@ -3805,13 +3834,29 @@
     if (eqTab === 'chests') { renderChests(box); return; }
     const order = it => EQUIP_SLOTS.findIndex(sl => sl.id === it.slot) * 10 + Object.keys(RARITY).indexOf(it.rarity);
     const catalog = eqTab === 'catalog';
-    const list = ITEMS.filter(it => catalog || !!S.items[it.id]).sort((a, b) => order(a) - order(b));
+    const base = ITEMS.filter(it => catalog || !!S.items[it.id]);
+    const list = base.filter(it =>
+      (eqFilter.rarity === 'all' || it.rarity === eqFilter.rarity) &&
+      (eqFilter.slot === 'all' || it.slot === eqFilter.slot) &&
+      (!catalog || eqFilter.own === 'all' || (eqFilter.own === 'have') === !!S.items[it.id])
+    ).sort((a, b) => order(a) - order(b));
     if (catalog) {
       const owned = ITEMS.filter(it => S.items[it.id]).length;
       box.innerHTML = `<p class="sub" style="grid-column:1/-1">Todos los objetos del juego. Tienes <b>${owned}/${ITEMS.length}</b>. Los que no tienes salen en los 🎰 Cofres o como botín de los jefes.</p>`;
     }
-    if (!list.length) {
+    if (!base.length) {
       box.innerHTML = '<p class="sub">Aún no tienes objetos. Ábrelos en los 🎰 Cofres o derrota jefes para conseguir botín.</p>';
+    } else {
+      box.appendChild(filterBar(catalog, list.length, base.length));
+      if (!list.length) {
+        const p = document.createElement('p');
+        p.className = 'sub'; p.style.gridColumn = '1 / -1';
+        p.innerHTML = 'Ningún objeto cumple estos filtros. ';
+        const b = document.createElement('button');
+        b.textContent = 'Quitar filtros';
+        b.addEventListener('click', () => { eqFilter.rarity = eqFilter.slot = eqFilter.own = 'all'; renderEquip(); });
+        p.appendChild(b); box.appendChild(p);
+      }
     }
     for (const it of list) {
       const rar = RARITY[it.rarity], lvl = S.items[it.id] || 0, slot = EQUIP_SLOTS.find(sl => sl.id === it.slot);

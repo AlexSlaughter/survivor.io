@@ -420,3 +420,23 @@ h2::before, h2::after { content: "✦"; font-family: Nunito, sans-serif; font-si
 .sel { transition: transform .12s, border-color .15s, background .15s; }
 .sel:not(.locked):hover { transform: translateY(-3px); border-color: var(--accent); }
 .sel.on { box-shadow: 0 0 0 3px rgba(138, 132, 238, .25), 0 6px 0 #c9bff0; }
+
+/* ---------- Filtros del catálogo ---------- */
+.filters { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; margin: 0 0 4px; text-align: left; }
+.frow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.flabel { width: 74px; flex-shrink: 0; font-size: 13px; font-weight: 800; color: var(--text-3); }
+.chip {
+  margin: 0; min-height: 34px; padding: 5px 12px; border-radius: 999px;
+  font-size: 13px; font-weight: 700; color: var(--text-2);
+  background: var(--card-strong); border: 1.5px solid var(--line); box-shadow: none;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.chip .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--rc); display: inline-block; }
+.chip:hover { border-color: var(--accent); }
+.chip.on { color: #fff; background: #7a72e6; border-color: #574fc0; }
+.chip.on .dot { box-shadow: 0 0 0 2px #fff; }
+.fcount { margin: 2px 0 0; font-size: 12px; color: var(--text-3); }
+@media (max-width: 480px) {
+  .flabel { width: 100%; }
+  .chip { padding: 4px 10px; font-size: 12px; min-height: 32px; }
+}
