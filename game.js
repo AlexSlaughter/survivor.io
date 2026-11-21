@@ -1322,9 +1322,9 @@
         if (e.shotT <= 0 && d < S_.range + 120) { e.shotT = S_.cd * rand(0.85, 1.15); summonAround(e, S_.type, S_.n); }
       }
       if (e.ranged) {
-        // Los tiradores mantienen la distancia: se acercan hasta su alcance y retroceden si te pegas.
+        // Los tiradores se paran a su alcance, pero ya no huyen: si te acercas, puedes alcanzarlos.
         const R = e.ranged.range;
-        if (d < R * 0.6) sp = -sp * 0.6; else if (d < R * 0.85) sp = 0;
+        if (d < R * 0.85 && d > R * 0.4) sp = 0;
         e.shotT -= dt;
         if (e.shotT <= 0 && d < R + 60 && e.frz <= 0) {
           e.shotT = e.ranged.cd * rand(0.85, 1.15);
@@ -1374,7 +1374,8 @@
 
   function enemyShoot(e, a) {
     const r = e.ranged, n = r.n;
-    if (G.ebullets.length > 260) return;
+    // Tope de balas enemigas en pantalla: con muchos tiradores juntos ya no se forma una cortina imposible.
+    if (G.ebullets.length > 45) { e.shotT = Math.max(e.shotT, 1); return; }
     for (let i = 0; i < n; i++) {
       const ang = a + spreadA(i, n, r.spread);
       G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(ang) * r.spd, vy: Math.sin(ang) * r.spd, r: 5, dmg: e.sdmg * (e.elite ? 1.5 : 1), life: 3, color: r.color });
@@ -1855,7 +1856,7 @@
     const t = G ? G.time : menuT;
     ctx.save();
     ctx.translate(e.x, e.y);
-    if (ctx === mainCtx && !e.boss && !e.warn && SPRITE_TYPES.has(e.type)) {
+    if (G && ctx === mainCtx && !e.boss && !e.warn && SPRITE_TYPES.has(e.type)) {
       const f = Math.floor((((e.wob % SPR_P) + SPR_P) % SPR_P) / SPR_P * SPR_N) % SPR_N;
       const s = enemySprite(e, r, f, e.flash > 0);
       ctx.imageSmoothingEnabled = false;   // el sprite ya está a la escala de la pantalla
@@ -3097,17 +3098,205 @@
     ctx.fillStyle = g; ctx.fillRect(v.x, v.y, v.w, v.h);
   }
 
-  // Fondo animado del menú
+  // ---------- Portal: escena animada detrás de los menús ----------
+  // Cielo de noche con luna, colinas del mapa elegido y tu personaje defendiéndose de una fila de monstruos.
   let menuT = 0;
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const PORTAL = { mobs: [], shots: [], bits: [], spawnT: 0.6, fireT: 0, aim: 0, sky: null, skyKey: '' };
+  const PARADE = ['slime', 'slime', 'murcielago', 'espectro', 'arana', 'lobo', 'calabaza', 'bruto', 'murcielago'];
+
+  function portalSky(map) {
+    const key = W + 'x' + H + map.id;
+    if (PORTAL.skyKey === key) return PORTAL.sky;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const c = document.createElement('canvas');
+    c.width = Math.ceil(W * dpr); c.height = Math.ceil(H * dpr);
+    const sc = c.getContext('2d');
+    sc.scale(dpr, dpr);
+    const g = sc.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#0e0b22'); g.addColorStop(0.55, tone(map.accent, -0.55)); g.addColorStop(1, tone(map.accent, -0.25));
+    sc.fillStyle = g; sc.fillRect(0, 0, W, H);
+    // Luna con halo y cráteres
+    const m = PORTAL.moon = { x: W * (W > H ? 0.8 : 0.78), y: H * (W > H ? 0.22 : 0.14), R: Math.min(W, H) * (W > H ? 0.11 : 0.13) };
+    const halo = sc.createRadialGradient(m.x, m.y, m.R * 0.8, m.x, m.y, m.R * 4);
+    halo.addColorStop(0, 'rgba(244,236,216,.35)'); halo.addColorStop(0.3, 'rgba(200,180,255,.12)'); halo.addColorStop(1, 'rgba(200,180,255,0)');
+    sc.fillStyle = halo; sc.fillRect(0, 0, W, H);
+    const mg = sc.createRadialGradient(m.x - m.R * 0.3, m.y - m.R * 0.3, m.R * 0.1, m.x, m.y, m.R);
+    mg.addColorStop(0, '#fffdf4'); mg.addColorStop(1, '#efe0b8');
+    sc.fillStyle = mg; sc.beginPath(); sc.arc(m.x, m.y, m.R, 0, TAU); sc.fill();
+    sc.fillStyle = 'rgba(190,170,130,.28)';
+    for (const [dx, dy, k] of [[0.3, -0.2, 0.22], [-0.35, 0.25, 0.16], [0.1, 0.45, 0.12], [-0.2, -0.45, 0.1]]) {
+      sc.beginPath(); sc.arc(m.x + dx * m.R, m.y + dy * m.R, k * m.R, 0, TAU); sc.fill();
+    }
+    PORTAL.sky = c; PORTAL.skyKey = key;
+    return c;
+  }
+
+  // Colina con siluetas del mapa (pinos, cactus, tumbas o bloques) que se desplaza en paralaje.
+  function portalHill(map, base, amp, col, speed, seed, deco) {
+    const off = reduceMotion ? 0 : menuT * speed;
+    const y = x => base - amp * (0.55 + 0.45 * Math.sin((x + off) * 0.004 + seed) * Math.sin((x + off) * 0.0017 + seed * 2));
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.moveTo(0, H);
+    for (let x = 0; x <= W + 20; x += 20) ctx.lineTo(x, y(x));
+    ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+    if (!deco) return;
+    const step = 46, kind = map.id === 'desierto' ? 'cactus' : map.id === 'cripta' ? 'tomb' : map.id === 'bloques' ? 'block' : 'pine';
+    for (let i = Math.floor(off / step) - 1; i < (off + W) / step + 1; i++) {
+      const h = hash(i, seed * 100 | 0);
+      if (h % 3 === 0) continue;
+      const x = i * step - off + (h >>> 8) % 30, gy = y(x) + 4, s = amp * (0.35 + ((h >>> 4) % 10) / 22);
+      ctx.beginPath();
+      if (kind === 'pine') {
+        ctx.moveTo(x, gy - s * 1.6); ctx.lineTo(x + s * 0.45, gy - s * 0.6); ctx.lineTo(x + s * 0.3, gy - s * 0.6);
+        ctx.lineTo(x + s * 0.6, gy); ctx.lineTo(x - s * 0.6, gy); ctx.lineTo(x - s * 0.3, gy - s * 0.6); ctx.lineTo(x - s * 0.45, gy - s * 0.6);
+      } else if (kind === 'cactus') {
+        ctx.rect(x - s * 0.12, gy - s * 1.2, s * 0.24, s * 1.2); ctx.rect(x - s * 0.45, gy - s * 0.8, s * 0.18, s * 0.45); ctx.rect(x + s * 0.27, gy - s * 0.95, s * 0.18, s * 0.5);
+      } else if (kind === 'tomb') {
+        ctx.moveTo(x - s * 0.3, gy); ctx.lineTo(x - s * 0.3, gy - s * 0.6); ctx.arc(x, gy - s * 0.6, s * 0.3, Math.PI, 0); ctx.lineTo(x + s * 0.3, gy);
+      } else {
+        ctx.rect(x - s * 0.4, gy - s * 0.8, s * 0.8, s * 0.8);
+      }
+      ctx.fill();
+    }
+  }
+
   function renderMenuBg(dt) {
     menuT += dt;
-    const map = mapById(S.map);
-    ctx.fillStyle = map.bg; ctx.fillRect(0, 0, W, H);
-    ctx.strokeStyle = map.grid; ctx.lineWidth = 1; ctx.beginPath();
-    const off = (menuT * 20) % 96;
-    for (let x = -off; x < W; x += 96) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
-    for (let y = -off; y < H; y += 96) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
-    ctx.stroke();
+    const map = mapById(S.map), P = PORTAL;
+    ctx.drawImage(portalSky(map), 0, 0, W, H);
+    // Estrellas que titilan
+    for (let i = 0; i < 90; i++) {
+      const h = hash(i, 17), x = (h % 1000) / 1000 * W, y = ((h >>> 10) % 1000) / 1000 * H * 0.6;
+      const tw = reduceMotion ? 0.7 : 0.5 + 0.5 * Math.sin(menuT * (1 + (h >>> 20) % 3) + i);
+      ctx.globalAlpha = 0.25 + 0.6 * tw;
+      ctx.fillStyle = '#f4ecd8';
+      const s = (h >>> 5) % 4 === 0 ? 2 : 1.2;
+      ctx.fillRect(x, y, s, s);
+    }
+    ctx.globalAlpha = 1;
+    const gy = H * (W > H ? 0.8 : 0.84);    // línea del suelo
+    portalHill(map, gy - H * 0.14, H * 0.12, tone(map.accent, -0.42), 6, 1.3, true);
+    portalHill(map, gy - H * 0.04, H * 0.09, tone(map.accent, -0.62), 14, 4.1, true);
+    // niebla al pie de las colinas
+    const fog = ctx.createLinearGradient(0, gy - H * 0.12, 0, gy + 10);
+    fog.addColorStop(0, 'rgba(200,190,255,0)'); fog.addColorStop(1, 'rgba(200,190,255,.14)');
+    ctx.fillStyle = fog; ctx.fillRect(0, gy - H * 0.12, W, H * 0.12 + 10);
+    // suelo
+    const gg = ctx.createLinearGradient(0, gy, 0, H);
+    gg.addColorStop(0, tone(map.accent, -0.7)); gg.addColorStop(1, map.bg);
+    ctx.fillStyle = gg; ctx.fillRect(0, gy, W, H - gy);
+    ctx.fillStyle = tone(map.accent, -0.35); ctx.fillRect(0, gy, W, 2);
+    // decorado del mapa en el suelo, desplazándose
+    const goff = reduceMotion ? 0 : menuT * 30;
+    for (let i = Math.floor(goff / 70) - 1; i < (goff + W) / 70 + 1; i++) {
+      const h = hash(i, 55);
+      drawDecor(map.decor[h % 3], i * 70 - goff + (h >>> 8) % 40, gy + 12 + (h >>> 12) % Math.max(8, (H - gy - 20) | 0), h);
+    }
+
+    // La batalla: escala según la pantalla para que se lea bien en móvil y en escritorio.
+    const s = Math.max(1.3, Math.min(2.2, Math.min(W, H) / 270));
+    const groundY = gy + Math.min(H - gy - 10, 26 * s);
+    const hx = Math.max(70, W * (W > H ? 0.2 : 0.18)), hy = groundY - 14 * s;
+    if (!reduceMotion) {
+      P.spawnT -= dt;
+      if (P.spawnT <= 0 && P.mobs.length < 8) {
+        P.spawnT = 0.9 + Math.random() * 0.9;
+        const type = PARADE[(Math.random() * PARADE.length) | 0], et = ETYPES[type];
+        const color = (map.colors && map.colors[type]) || et.color || '#ccc';
+        P.mobs.push({ type, color, r: et.r, x: W + 60, y: groundY - (type === 'murcielago' ? 70 * s : et.r * s) - Math.random() * 8 * s,
+          vx: -(type === 'lobo' ? 95 : type === 'murcielago' ? 80 : 45 + Math.random() * 25) * s, hp: type === 'bruto' ? 4 : 2, wob: Math.random() * TAU, flash: 0, frz: 0 });
+      }
+      P.fireT -= dt;
+      const tgt = P.mobs.filter(m => m.hp > 0 && m.x < W - 20).sort((a, b) => a.x - b.x)[0];
+      if (tgt) P.aim = Math.atan2(tgt.y - (hy - 2 * s), tgt.x - hx);
+      if (tgt && P.fireT <= 0) {
+        P.fireT = 0.42;
+        const sp = 700;
+        P.shots.push({ x: hx + Math.cos(P.aim) * 18 * s, y: hy - 2 * s + Math.sin(P.aim) * 18 * s, vx: Math.cos(P.aim) * sp, vy: Math.sin(P.aim) * sp, life: 1.2 });
+      }
+      for (const m of P.mobs) {
+        m.x += m.vx * dt; m.wob += dt * 6; m.flash -= dt;
+        if (m.type === 'murcielago') m.y += Math.sin(m.wob * 0.8) * 30 * s * dt;
+        if (m.x < hx + 40 * s) m.hp = 0;
+      }
+      for (const b of P.shots) {
+        b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+        for (const m of P.mobs) {
+          if (m.hp > 0 && Math.hypot(m.x - b.x, m.y - b.y) < m.r * s + 4) { m.hp--; m.flash = 0.1; m.x += 10 * s; b.life = 0; break; }
+        }
+      }
+      for (const m of P.mobs) if (m.hp <= 0 && !m.dead) {
+        m.dead = true;
+        for (let i = 0; i < 14; i++) {
+          const a = Math.random() * TAU, v = (60 + Math.random() * 160) * s;
+          P.bits.push({ x: m.x, y: m.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60 * s, life: 0.6, max: 0.6, color: i % 3 ? m.color : '#fff', gem: false });
+        }
+        P.bits.push({ x: m.x, y: m.y, vx: 0, vy: -120 * s, life: 1.4, max: 1.4, color: '#5ab8ff', gem: true });
+      }
+      for (const q of P.bits) {
+        q.life -= dt;
+        if (q.gem) { const k = 1 - q.life / q.max; q.x += (hx - q.x) * Math.min(1, dt * 3 * k * 3); q.y += q.vy * dt * (1 - k) + (hy - q.y) * Math.min(1, dt * 3 * k * 3); }
+        else { q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 400 * s * dt; }
+      }
+      P.mobs = P.mobs.filter(m => !m.dead && m.x > -100);
+      P.shots = P.shots.filter(b => b.life > 0 && b.x < W + 50);
+      P.bits = P.bits.filter(q => q.life > 0);
+    }
+
+    // Luz de farol del héroe sobre el suelo
+    ctx.save(); ctx.beginPath(); ctx.rect(0, gy, W, H - gy); ctx.clip();
+    const lg = ctx.createRadialGradient(hx, groundY, 10, hx, groundY, 150 * s);
+    lg.addColorStop(0, 'rgba(255,220,150,.24)'); lg.addColorStop(1, 'rgba(255,220,150,0)');
+    ctx.fillStyle = lg; ctx.beginPath(); ctx.ellipse(hx, groundY, 150 * s, 50 * s, 0, 0, TAU); ctx.fill();
+    ctx.restore();
+
+    // Monstruos (de lejos a cerca), dibujados en directo y mirando hacia el héroe
+    const saved = [camX, CVW];
+    camX = -1e6; CVW = 0;
+    for (const m of P.mobs) {
+      ctx.save(); ctx.translate(m.x, m.y); ctx.scale(s, s);
+      drawEnemy({ ...m, x: 0, y: 0 });
+      ctx.restore();
+    }
+    [camX, CVW] = saved;
+
+    // Héroe con su arma equipada
+    const ch = charById(S.char), wpn = gearStats(myGear()).weapon || 'basico';
+    ctx.save(); ctx.translate(hx, hy); ctx.scale(s, s);
+    shadow(0, 0, 14);
+    drawHero(0, 0, 14, ch, { x: Math.cos(P.aim) || 1, y: Math.sin(P.aim) * 0.5, side: 1, walk: 0, wpn, aim: P.aim }, Math.sin(menuT * 3) * 1);
+    ctx.restore();
+
+    // Disparos, chispas y cristales
+    ctx.lineCap = 'round';
+    for (const b of P.shots) {
+      ctx.strokeStyle = 'rgba(255,233,168,.45)'; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx * 0.035, b.y - b.vy * 0.035); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, TAU); ctx.fill();
+    }
+    ctx.lineCap = 'butt';
+    for (const q of P.bits) {
+      ctx.globalAlpha = Math.min(1, q.life / q.max * 1.5);
+      if (q.gem) {
+        const g = 6 * s / 1.4;
+        ctx.beginPath(); ctx.moveTo(q.x, q.y - g); ctx.lineTo(q.x + g * 0.7, q.y); ctx.lineTo(q.x, q.y + g); ctx.lineTo(q.x - g * 0.7, q.y); ctx.closePath();
+        paint('#5ab8ff', 1.5);
+      } else { ctx.fillStyle = q.color; ctx.beginPath(); ctx.arc(q.x, q.y, 2.5 * s, 0, TAU); ctx.fill(); }
+    }
+    ctx.globalAlpha = 1;
+
+    // Luciérnagas
+    for (let i = 0; i < 16; i++) {
+      const h = hash(i, 91), t = reduceMotion ? i : menuT * (0.2 + (h % 7) / 30) + i;
+      const x = ((h % 1000) / 1000 * W + Math.sin(t) * 40 + menuT * 6) % (W + 40) - 20;
+      const y = gy - H * 0.2 + ((h >>> 10) % 1000) / 1000 * H * 0.3 + Math.cos(t * 1.3) * 20;
+      const a = 0.4 + 0.6 * Math.abs(Math.sin(t * 2 + i));
+      ctx.globalAlpha = a * 0.22; ctx.fillStyle = '#ffd84a';
+      ctx.beginPath(); ctx.arc(x, y, 5, 0, TAU); ctx.fill();
+      ctx.globalAlpha = a; ctx.fillStyle = '#fff6b0'; ctx.beginPath(); ctx.arc(x, y, 1.8, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
   }
 
   // Vistas de la pantalla: en cooperativo local, una por jugador (lado a lado en horizontal,

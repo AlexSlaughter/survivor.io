@@ -1,7 +1,7 @@
 /* Tema claro para los menús: paneles blancos, texto oscuro y acentos suaves. */
 :root {
   /* Paleta pastel: lavanda, cielo y crema; nada de blanco puro. */
-  --veil: linear-gradient(135deg, rgba(221, 210, 246, .9), rgba(205, 230, 245, .9));
+  --veil: linear-gradient(160deg, rgba(40, 32, 90, .55), rgba(22, 18, 43, .7));
   --panel: #f5f0fb;
   --panel-line: #e1d6f2;
   --card: #ece5f8;
@@ -55,7 +55,7 @@ html, body {
   padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
            max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   background: var(--veil);
-  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
   touch-action: pan-y;
 }
 .panel {
@@ -133,7 +133,7 @@ button:disabled { opacity: .45; cursor: default; filter: grayscale(.4); }
 }
 .sel.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 3px rgba(138, 132, 238, .18); }
 .sel.locked { opacity: .9; }
-.sel.locked canvas, .sel.locked .preview { filter: grayscale(.8) brightness(.9); }
+.sel.locked canvas, .sel.locked .preview { filter: saturate(.55) brightness(.75); }
 .sel canvas { width: 76px; height: 76px; border-radius: 14px; }
 .sel canvas.preview { width: 100%; height: auto; aspect-ratio: 3 / 1; border-radius: 10px; }
 .sel .nm { font-weight: 800; font-size: 17px; color: var(--text); }
@@ -353,3 +353,70 @@ h2.p2, b.p2 { color: #c9628f; }
 @media (max-width: 360px) {
   .seg { flex-wrap: wrap; }
 }
+
+/* ================= Portal ================= */
+/* El menú principal no tiene caja: el título y los botones flotan sobre la escena animada. */
+#menu { background: none; backdrop-filter: none; -webkit-backdrop-filter: none; align-items: flex-start; }
+#menu .panel {
+  max-width: 600px; background: none; border: none; box-shadow: none;
+  padding-top: clamp(4px, 4vh, 44px); overflow: visible;
+}
+#menu .topbar { margin-bottom: clamp(4px, 3vh, 28px); }
+#menu .gold, #menu .tgl {
+  background: rgba(22, 18, 43, .55); border: 1.5px solid rgba(200, 190, 255, .3);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: none;
+}
+#menu .gold { padding: 6px 14px; border-radius: 999px; color: #ffd75e; }
+#menu .tgl { color: var(--moon); }
+#menu h1 {
+  font-size: clamp(64px, 19vw, 128px); line-height: .78; margin: 0 0 14px;
+  color: var(--moon);
+  text-shadow: 0 5px 0 var(--night), 0 0 46px rgba(190, 160, 255, .55);
+}
+#menu h1::before { display: none; }
+#menu h1 span { color: #c9a8ff; }
+#menu .tag { color: #e4dcf6; font-size: clamp(15px, 3.8vw, 18px); text-shadow: 0 2px 6px rgba(10, 8, 26, .8); }
+#menu .tag b { color: #ffd75e; }
+#playBtn {
+  font-family: var(--display); font-weight: 800; font-size: clamp(30px, 8vw, 40px); line-height: 1;
+  padding: 12px 64px 16px; margin: 8px 0 14px; border-radius: 999px;
+  color: var(--night); background: #ffd75e; border: 3px solid var(--night);
+  box-shadow: 0 6px 0 var(--night), 0 0 36px rgba(255, 215, 94, .45);
+}
+#playBtn:hover { background: #ffe07e; transform: translateY(-2px); box-shadow: 0 8px 0 var(--night), 0 0 46px rgba(255, 215, 94, .6); }
+#playBtn:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--night), 0 0 30px rgba(255, 215, 94, .4); }
+#menu .row2 button {
+  border-radius: 999px; color: var(--moon);
+  background: rgba(22, 18, 43, .6); border: 1.5px solid rgba(200, 190, 255, .35);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 3px 0 rgba(10, 8, 26, .7);
+}
+#menu .row2 button:hover { background: rgba(58, 50, 112, .75); border-color: rgba(220, 210, 255, .6); }
+#menu .best { color: rgba(244, 236, 216, .8); text-shadow: 0 1px 4px rgba(10, 8, 26, .9); }
+#menu .compnote { background: rgba(227, 244, 236, .92); }
+@media (max-height: 500px) {
+  #menu h1 { font-size: 56px; margin-bottom: 4px; }
+  #playBtn { font-size: 28px; padding: 8px 48px 11px; margin: 4px 0 8px; }
+}
+
+/* ================= Menús ================= */
+/* Tarjetas pastel que flotan sobre la noche: una banda nocturna arriba con estrellas las une al portal. */
+.panel {
+  border-radius: 22px; border: none;
+  background:
+    radial-gradient(circle at 12% 40%, #fff 0 1px, transparent 1.5px),
+    radial-gradient(circle at 38% 70%, #fff 0 1px, transparent 1.5px),
+    radial-gradient(circle at 63% 30%, #fff 0 1.2px, transparent 1.7px),
+    radial-gradient(circle at 88% 60%, #fff 0 1px, transparent 1.5px),
+    radial-gradient(circle at 94% 50%, #f6e9c4 0 7px, transparent 7.5px),
+    linear-gradient(90deg, #2a2350, #3a3270) top / 100% 14px no-repeat,
+    var(--panel);
+  background-repeat: no-repeat;
+  background-size: 100% 14px, 100% 14px, 100% 14px, 100% 14px, 100% 14px, 100% 14px, auto;
+  padding-top: calc(clamp(14px, 3vw, 24px) + 10px);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .5) inset, 0 24px 60px rgba(10, 8, 26, .45);
+}
+h2::before, h2::after { content: "✦"; font-family: Nunito, sans-serif; font-size: .45em; color: #c99a2e; vertical-align: middle; margin: 0 .5em; }
+.sel { transition: transform .12s, border-color .15s, background .15s; }
+.sel:not(.locked):hover { transform: translateY(-3px); border-color: var(--accent); }
+.sel.on { box-shadow: 0 0 0 3px rgba(138, 132, 238, .25), 0 6px 0 #c9bff0; }

@@ -126,9 +126,9 @@ window.HN_DATA = {
     bruto:      { hp: 60, speed: 42,  dmg: 15, r: 18, xp: 4 },
     // Enemigos a distancia: se quedan lejos y disparan proyectiles que se pueden esquivar.
     escupidor:  { hp: 16, speed: 52,  dmg: 6,  r: 12, xp: 2, color: '#a6e05a',
-      ranged: { range: 250, cd: 2.8, spd: 165, dmg: 9, n: 1, spread: 0, color: '#c8ff6a' } },
+      ranged: { range: 230, cd: 4.2, spd: 140, dmg: 7, n: 1, spread: 0, color: '#c8ff6a' } },
     brujo:      { hp: 48, speed: 46,  dmg: 10, r: 15, xp: 4, color: '#c47bff',
-      ranged: { range: 300, cd: 3.4, spd: 150, dmg: 12, n: 3, spread: 0.28, color: '#e3a6ff' } },
+      ranged: { range: 260, cd: 5.0, spd: 130, dmg: 10, n: 2, spread: 0.3, color: '#e3a6ff' } },
     // Rápida y en zigzag, pero muy frágil.
     arana:      { hp: 9,  speed: 118, dmg: 6,  r: 10, xp: 1, color: '#cfd2e0', zigzag: true },
     // Se para, avisa (brilla en rojo) y embiste en línea recta: apártate de su camino.
