@@ -27,6 +27,31 @@ window.HN_DATA = {
       up: ['Más daño', '+1 disco', 'Más daño y recarga más rápida', '+1 disco'],
       evo: 'poder', evoName: 'Eclipse Giratorio',
     },
+    dagas: {
+      name: 'Dagas Arrojadizas', icon: '🔪', desc: 'Lanza dagas rápidas hacia donde miras.',
+      up: ['+1 daga', 'Más daño y cadencia', 'Atraviesan a un enemigo', '+1 daga'],
+      evo: 'botas', evoName: 'Tormenta de Acero',
+    },
+    latigo: {
+      name: 'Látigo de Espinas', icon: '🪢', desc: 'Azota en línea a los enemigos de tu lado.',
+      up: ['Más daño y alcance', 'Azota también hacia atrás', 'Más daño y rapidez', 'Más daño y alcance'],
+      evo: 'coraza', evoName: 'Látigo Vampírico',
+    },
+    meteoro: {
+      name: 'Lluvia de Meteoros', icon: '☄️', desc: 'Meteoros caen sobre los enemigos y explotan en área.',
+      up: ['Más daño', '+1 meteoro', 'Más daño y explosión más grande', '+1 meteoro'],
+      evo: 'pergamino', evoName: 'Apocalipsis',
+    },
+    hielo: {
+      name: 'Nova Helada', icon: '❄️', desc: 'Onda de hielo a tu alrededor que daña y ralentiza.',
+      up: ['Más radio y daño', 'Ralentiza más tiempo', 'Más radio y daño', 'Más daño y recarga más rápida'],
+      evo: 'iman', evoName: 'Cero Absoluto',
+    },
+    veneno: {
+      name: 'Frasco Tóxico', icon: '🧪', desc: 'Lanza frascos que dejan charcos de veneno en el suelo.',
+      up: ['Más daño', 'Charco más grande y duradero', '+1 frasco', 'Más daño y charco más grande'],
+      evo: 'lupa', evoName: 'Pantano Pestilente',
+    },
   },
 
   // Armas principales: el ataque principal de cualquier personaje. Todos empiezan con el básico;
@@ -90,6 +115,8 @@ window.HN_DATA = {
     iman:    { name: 'Imán Lunar',      icon: '🧲', desc: '+30% radio de recogida.',            max: 5, apply: p => { p.stats.magnet += 0.30; } },
     lupa:    { name: 'Lente Prisma',    icon: '🔍', desc: '+10% área de ataque.',               max: 5, apply: p => { p.stats.area += 0.10; } },
     tomo:    { name: 'Tomo Duplicador', icon: '📘', desc: '+1 proyectil para todas las armas.', max: 2, apply: p => { p.stats.proj += 1; } },
+    coraza:  { name: 'Coraza de Hierro', icon: '🛡️', desc: '+1 armadura (menos daño recibido).', max: 5, apply: p => { p.stats.armor += 1; } },
+    pergamino: { name: 'Pergamino Sabio', icon: '📜', desc: '+10% de experiencia.',             max: 5, apply: p => { p.stats.xp += 0.10; } },
   },
 
   ETYPES: {
@@ -97,6 +124,11 @@ window.HN_DATA = {
     murcielago: { hp: 7,  speed: 105, dmg: 6,  r: 9,  xp: 1 },
     espectro:   { hp: 24, speed: 75,  dmg: 10, r: 13, xp: 2 },
     bruto:      { hp: 60, speed: 42,  dmg: 15, r: 18, xp: 4 },
+    // Enemigos a distancia: se quedan lejos y disparan proyectiles que se pueden esquivar.
+    escupidor:  { hp: 16, speed: 52,  dmg: 6,  r: 12, xp: 2, color: '#a6e05a',
+      ranged: { range: 250, cd: 2.8, spd: 165, dmg: 9, n: 1, spread: 0, color: '#c8ff6a' } },
+    brujo:      { hp: 48, speed: 46,  dmg: 10, r: 15, xp: 4, color: '#c47bff',
+      ranged: { range: 300, cd: 3.4, spd: 150, dmg: 12, n: 3, spread: 0.28, color: '#e3a6ff' } },
   },
 
   BOSSES: [
