@@ -768,8 +768,8 @@
       const dmg = 13 * mainMul(w) * s.dmg;
       for (let k = 0; k <= s.proj; k++) {
         // Con proyectiles extra golpea otra vez un instante después.
-        setTimeout(() => {
-          if (!G || p.down) return;
+        later(k * 0.18, () => {
+          if (p.down) return;
           query(p.x, p.y, R, e => {
             const kx = e.x - p.x, ky = e.y - p.y, l = Math.hypot(kx, ky) || 1;
             hurt(e, dmg, kx / l, ky / l, 320);
@@ -778,7 +778,7 @@
           netOut(['r', Math.round(p.x), Math.round(p.y), Math.round(R)]);
           G.shake = Math.max(G.shake, 5);
           sfx('boom', 0.05);
-        }, k * 180);
+        });
       }
     },
     // Katana Nichirin: tajo amplio de agua, más rápido que la katana normal.
@@ -834,8 +834,8 @@
       w.t = (1.1 - 0.05 * (w.lvl - 1)) * s.cd;
       for (let k = 0; k <= s.proj; k++) {
         const crit = Math.random() < 0.25, dmg = 12 * mainMul(w) * s.dmg * (crit ? 2.5 : 1), col = crit ? '#ff2d55' : '#6a5acd';
-        setTimeout(() => {
-          if (!G || p.down) return;
+        later(k * 0.16, () => {
+          if (p.down) return;
           query(p.x, p.y, R, e => {
             const kx = e.x - p.x, ky = e.y - p.y, l = Math.hypot(kx, ky) || 1;
             hurt(e, dmg, kx / l, ky / l, crit ? 320 : 180);
@@ -844,7 +844,7 @@
           netOut(['r', Math.round(p.x), Math.round(p.y), Math.round(R), col]);
           if (crit) G.shake = Math.max(G.shake, 5);
           sfx('boom', 0.05);
-        }, k * 160);
+        });
       }
     },
     // Balón: un chut potente que atraviesa a tres enemigos y los aparta mucho.
@@ -1640,8 +1640,20 @@
     for (const f of G.effects) { f.life -= dt; if (f.life <= 0) f.dead = true; }
   }
 
+  // Acciones retrasadas con el reloj de la partida (no con setTimeout): en pausa se detienen
+  // y no pueden caer en otra partida.
+  function later(delay, fn) { (G.later || (G.later = [])).push({ t: G.time + delay, fn }); }
+  function runLater() {
+    if (!G.later || !G.later.length) return;
+    const due = G.later.filter(x => x.t <= G.time);
+    if (!due.length) return;
+    G.later = G.later.filter(x => x.t > G.time);
+    for (const x of due) x.fn();
+  }
+
   function update(dt) {
     G.time += dt;
+    runLater();
     buildGrid();
     updatePlayers(dt);
     spawner(dt);

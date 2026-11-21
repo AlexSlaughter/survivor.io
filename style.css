@@ -440,3 +440,19 @@ h2::before, h2::after { content: "✦"; font-family: Nunito, sans-serif; font-si
   .flabel { width: 100%; }
   .chip { padding: 4px 10px; font-size: 12px; min-height: 32px; }
 }
+
+/* Los botones de abajo (Volver, Comenzar…) se quedan fijos al pie del panel: no hace falta bajar hasta el final. */
+.panel > .actions {
+  --pad: clamp(14px, 3vw, 24px); --px: clamp(14px, 3vw, 22px);
+  position: sticky; bottom: calc(-1 * var(--pad)); z-index: 3;
+  margin: 10px calc(-1 * var(--px)) calc(-1 * var(--pad));
+  padding: 14px var(--px) var(--pad);
+  background: linear-gradient(rgba(245, 240, 251, 0), var(--panel) 32%);
+}
+.panel > .actions .msg { flex-basis: 100%; margin: 0 0 4px; }
+.panel > .actions .msg:empty { display: none; }
+@media (max-height: 500px) {
+  .panel > .actions { --pad: 10px; --px: 14px; padding-top: 8px; }
+}
+/* Al desplazarse (también con el teclado), lo que queda bajo la barra fija se sube para que no se tape. */
+.panel { scroll-padding-bottom: 96px; }
