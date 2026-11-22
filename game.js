@@ -224,7 +224,7 @@
   // Versiones más oscuras de los colores de jugador para los textos de los menús (fondo claro).
   const PTEXT = ['#3f8fb3', '#c9628f', '#b0841f', '#3a9a6c'];
   let G = null;
-  let state = 'menu'; // menu | play | levelup | paused | over | win
+  let state = 'menu'; // menu | play | levelup | paused | countdown | over | win
 
   // Suma las bonificaciones del equipo puesto. Cada nivel añade un 50% del valor base.
   const itemValue = (v, lvl) => v * (1 + 0.5 * (lvl - 1));
@@ -346,7 +346,7 @@
   addEventListener('keyup', e => { keys[e.code] = false; });
   addEventListener('blur', () => { for (const k in keys) keys[k] = false; releaseJoys(); });
   canvas.addEventListener('pointerdown', e => {
-    if (state !== 'play') return;
+    if (state !== 'play' && state !== 'countdown') return;
     // En cooperativo local, cada jugador usa su mitad de la pantalla partida.
     const second = splitSide() ? e.clientX >= W / 2 : e.clientY >= H / 2;
     const j = joys[G.coop && !G.online && second ? 1 : 0];
@@ -3273,7 +3273,7 @@
     }
 
     // Joysticks táctiles
-    if (state === 'play') {
+    if (state === 'play' || state === 'countdown') {
       joys.forEach((j, i) => {
         if (!j.active) return;
         const jx = j.x - j.ox, jy = j.y - j.oy, l = Math.hypot(jx, jy), m = Math.min(l, JR);
@@ -3708,6 +3708,14 @@
     c.className = 'preview'; c.width = src.width; c.height = src.height;
     c.getContext('2d').drawImage(src, 0, 0);
     return c;
+  }
+
+  function resetGfx() {
+    sprites.clear(); sprK = 0;
+    moonC = null; moonKey = '';
+    PORTAL.sky = null; PORTAL.skyKey = '';
+    previews.clear();
+    resize();
   }
 
   function bump(el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); Sound.play('error'); }
@@ -4424,6 +4432,7 @@
         }
         case 'go': if (state === 'levelup') { state = 'play'; showOnly(null); } break;
         case 'paused': guestSetPaused(m.on); break;
+        case 'resume': if (state === 'paused') startCountdown(); break;
         case 'end': guestEnd(m); break;
       }
     } else if (G.online === 'host') {
@@ -4630,7 +4639,7 @@
 
   function toMenu() {
     if (Net.role) leaveOnline();
-    G = null; state = 'menu';
+    G = null; state = 'menu'; showCountdown(0);
     Sound.stopMusic(); Sound.resume();
     $('pauseBtn').classList.add('hidden');
     $('retryBtn').classList.remove('hidden');
@@ -4638,31 +4647,56 @@
     openMenu();
   }
 
+  // Al reanudar hay una cuenta atrás de 3 s con el juego congelado, para poder recolocarse.
+  const COUNTDOWN = 3;
+  let cdT = 0, cdShown = 0;
+  function showCountdown(n) {
+    const el = $('countdown');
+    if (!n) { el.classList.add('hidden'); cdShown = 0; return; }
+    if (n === cdShown) return;
+    cdShown = n;
+    el.textContent = n;
+    el.classList.remove('hidden', 'tick'); void el.offsetWidth; el.classList.add('tick');
+    Sound.play('click');
+  }
+  function enterPause() {
+    state = 'paused';
+    cdT = 0; showCountdown(0);
+    releaseJoys();
+    renderBuild(); syncToggles();
+    showOnly('pause');
+    Sound.suspend();
+  }
+  function startCountdown() {
+    state = 'countdown';
+    cdT = COUNTDOWN;
+    showOnly(null);
+    Sound.resume();
+    showCountdown(COUNTDOWN);
+  }
+  function tickCountdown(dt) {
+    cdT -= dt;
+    if (cdT > 0) { showCountdown(Math.ceil(cdT)); return; }
+    showCountdown(0);
+    state = 'play';
+    if (G && G.online === 'host') Net.send({ t: 'paused', on: false });
+  }
   function togglePause() {
     if (G && G.online === 'guest') {
-      if (state === 'play' || state === 'paused') Net.send({ t: 'pausereq' });
+      if (state === 'play' || state === 'paused' || state === 'countdown') Net.send({ t: 'pausereq' });
       return;
     }
-    if (state === 'play') {
-      state = 'paused';
-      releaseJoys();
-      renderBuild(); syncToggles();
-      showOnly('pause');
-      Sound.suspend();
+    if (state === 'play' || state === 'countdown') {
+      enterPause();
       if (G && G.online === 'host') Net.send({ t: 'paused', on: true });
     } else if (state === 'paused') {
-      state = 'play';
-      Sound.resume();
-      showOnly(null);
-      if (G && G.online === 'host') Net.send({ t: 'paused', on: false });
+      startCountdown();
+      if (G && G.online === 'host') Net.send({ t: 'resume' });
     }
   }
   function guestSetPaused(on) {
-    if (on && state === 'play') {
-      state = 'paused'; releaseJoys(); renderBuild(); syncToggles(); showOnly('pause'); Sound.suspend();
-    } else if (!on && state === 'paused') {
-      state = 'play'; Sound.resume(); showOnly(null);
-    }
+    if (on && (state === 'play' || state === 'countdown')) enterPause();
+    else if (!on && (state === 'paused' || state === 'countdown')) { showCountdown(0); if (state === 'paused') { showOnly(null); Sound.resume(); } state = 'play'; }
   }
 
   function renderBuild() {
@@ -4774,10 +4808,18 @@
   document.querySelectorAll('.back').forEach(b => b.addEventListener('click', () => { Sound.play('click'); openMenu(); }));
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      if (state === 'play') togglePause();
+      if (state === 'play' || state === 'countdown') togglePause();
       else if (state === 'levelup') Sound.suspend();
-    } else if (state === 'levelup') Sound.resume();
+    } else {
+      resetGfx();
+      if (state === 'levelup') Sound.resume();
+    }
   });
+  // En móvil, al volver de otra app el navegador puede haber descartado el lienzo: se reinician
+  // su escala y todas las imágenes guardadas (sprites de enemigos, luz de luna, cielo del portal…).
+  canvas.addEventListener('contextrestored', resetGfx);
+  addEventListener('pageshow', resetGfx);
+  addEventListener('focus', resetGfx);
   openMenu();
   if (pendingComp) showComp(pendingComp);
 
@@ -4787,6 +4829,7 @@
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     pollPads();
+    if (state === 'countdown') tickCountdown(dt);
     if (G && G.online === 'guest') {
       if (state !== 'paused' && state !== 'over' && state !== 'win') updateGuest(dt);
     } else if (state === 'play') update(dt);
