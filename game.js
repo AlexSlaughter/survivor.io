@@ -1335,6 +1335,7 @@
     G.arena = { x: cx, y: cy, R, t: 0, color };
     // Lo que ya estaba dentro sale despedido hacia fuera (los élites también).
     for (const e of G.enemies) if (!e.boss) e.inA = false;
+    for (const b of G.ebullets) b.inA = false;
   }
   function closeArenaIfDone() {
     if (!G.arena || G.enemies.some(o => o.boss && !o.dead)) return;
@@ -1360,7 +1361,7 @@
     const x = a.x + Math.cos(an) * a.R * 0.68, y = a.y + Math.sin(an) * a.R * 0.68;
     const hp = b.hp * G.map.hp * G.diffBoss;
     const e = {
-      x, y, type: 'boss', r: b.r, hp, maxHp: hp, speed: b.speed * G.map.speed, dmg: b.dmg, xp: 60, color: b.color,
+      x, y, type: 'boss', r: b.r, hp, maxHp: hp, speed: b.speed * G.map.speed * 1.15, dmg: b.dmg, xp: 60, color: b.color,
       flash: 0, kx: 0, ky: 0, slow: 0, frz: 0, boss: true, final: b.final, name: b.name, shots: b.shots,
       ai: b.ai || 'ring', variant: BOSSES.indexOf(b), shotT: 3, sumT: 2, chT: 4, mode: 0, wob: 0, phase: 0, inA: true,
     };
@@ -1543,7 +1544,8 @@
 
   function bombBlast(e) {
     const R = e.bomb.R;
-    for (const p of G.players) if (!p.down && dist2(e.x, e.y, p.x, p.y) < (R + p.r) ** 2) damagePlayer(p, e.sdmg);
+    const fenced = G.arena && !e.inA;
+    for (const p of G.players) if (!p.down && !fenced && dist2(e.x, e.y, p.x, p.y) < (R + p.r) ** 2) damagePlayer(p, e.sdmg);
     G.effects.push({ type: 'boom', x: e.x, y: e.y, R, life: 0.35, max: 0.35 });
     netOut(['x', Math.round(e.x), Math.round(e.y), R]);
     G.shake = Math.max(G.shake, 5);
@@ -1569,7 +1571,7 @@
     if (G.ebullets.length > 45) { e.shotT = Math.max(e.shotT, 1); return; }
     for (let i = 0; i < n; i++) {
       const ang = a + spreadA(i, n, r.spread);
-      G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(ang) * r.spd, vy: Math.sin(ang) * r.spd, r: 5, dmg: e.sdmg * (e.elite ? 1.5 : 1), life: 3, color: r.color });
+      G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(ang) * r.spd, vy: Math.sin(ang) * r.spd, r: 5, dmg: e.sdmg * (e.elite ? 1.5 : 1), life: 3, color: r.color, inA: !!e.inA });
     }
     e.flash = 0.06;
     sfx('pew', 0.12);
@@ -1579,29 +1581,44 @@
     e.phase += 0.3;
     for (let i = 0; i < n && G.ebullets.length < 300; i++) {
       const a = i / n * TAU + e.phase;
-      G.ebullets.push(Object.assign({ x: e.x, y: e.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r: 7, dmg, life: 5, color }, extra));
+      G.ebullets.push(Object.assign({ x: e.x, y: e.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r: 7, dmg, life: 5, color, inA: true }, extra));
     }
   }
   function bossFan(e, a, n, step, spd, dmg, color, r = 8) {
     for (let i = 0; i < n && G.ebullets.length < 300; i++) {
       const ang = a + spreadA(i, n, step);
-      G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, r, dmg, life: 4, color });
+      G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, r, dmg, life: 4, color, inA: true });
     }
   }
 
+  // Los jefes atacan más a menudo que antes (la jaula ya os protege de la horda) y, con la mitad
+  // de la vida, se enfurecen: aún más rápidos, más proyectiles y se mueven más deprisa.
+  const BOSS_PACE = 1.3, BOSS_RAGE_PACE = 1.65;
   function bossAI(e, dt, tg, ux, uy) {
     const aim = Math.atan2(uy, ux);
-    e.shotT -= dt;
+    if (!e.rage && e.hp < e.maxHp * 0.5) {
+      e.rage = true;
+      if (e.speed) e.speed *= 1.2;
+      if (e.saveSpeed) e.saveSpeed *= 1.2;
+      e.flash = 0.3; G.shake = Math.max(G.shake, 8);
+      burst(e.x, e.y, e.color, 30, 220);
+      toast(`💢 ¡${e.name} se enfurece!`);
+      sfx('warn');
+    }
+    const pace = e.rage ? BOSS_RAGE_PACE : BOSS_PACE, extra = e.rage ? 4 : 0;
+    // Los temporizadores de ataque corren más deprisa (los avisos del dragón duran lo mismo).
+    const tdt = dt * pace;
+    e.shotT -= tdt;
     if (e.ai === 'summon') {
       // Reina Araña: crías cada pocos segundos y anillos de telaraña que ralentizan.
-      e.sumT -= dt;
-      if (e.sumT <= 0) { e.sumT = 5; summonAround(e, 'arana', 2 + G.players.length); }
-      if (e.shotT <= 0) { e.shotT = 2.8; bossRing(e, e.shots, 150, 10, '#e8eaf5', { web: 1, r: 8 }); }
+      e.sumT -= tdt;
+      if (e.sumT <= 0) { e.sumT = 5; summonAround(e, 'arana', 2 + G.players.length + (e.rage ? 2 : 0)); }
+      if (e.shotT <= 0) { e.shotT = 2.8; bossRing(e, e.shots + extra, 150, 10, '#e8eaf5', { web: 1, r: 8 }); }
       return;
     }
     if (e.ai === 'charge') {
       // Dragón de Hueso: se prepara (brilla), embiste y escupe fuego en abanico al acabar.
-      e.chT -= dt;
+      e.chT -= tdt;
       if (e.mode === 0 && e.chT <= 0) { e.mode = 1; e.modeT = 0.9; e.ca = aim; e.saveSpeed = e.saveSpeed || e.speed; e.speed = 0; }
       else if (e.mode === 1) {
         e.modeT -= dt;
@@ -1613,17 +1630,19 @@
         e.modeT -= dt;
         if (e.modeT <= 0) {
           e.mode = 0; e.chT = 4.5; e.speed = e.saveSpeed;
-          bossFan(e, aim, e.shots, 0.16, 210, 16, '#ffb347', 9);
+          bossFan(e, aim, e.shots + (e.rage ? 2 : 0), 0.16, 210, 16, '#ffb347', 9);
           G.shake = Math.max(G.shake, 6); sfx('boom', 0.1);
         }
       }
-      if (e.mode === 0 && e.shotT <= 0) { e.shotT = 3.2; bossRing(e, 10, 150, 13, e.color); }
+      if (e.mode === 0 && e.shotT <= 0) { e.shotT = 3.2; bossRing(e, 10 + extra, 150, 13, e.color); }
       return;
     }
     if (e.shotT > 0) return;
     e.shotT = e.final ? 1.8 : 2.6;
-    bossRing(e, e.shots, 160, e.final ? 18 : 12, e.color);
-    if (e.ai === 'king') bossFan(e, aim, 3, 0.15, 230, 22, '#ffd75e');
+    bossRing(e, e.shots + extra, 160, e.final ? 18 : 12, e.color);
+    // Además, todos los jefes de anillos lanzan una ráfaga dirigida (el Rey, más grande).
+    if (e.ai === 'king') bossFan(e, aim, e.rage ? 5 : 3, 0.15, 230, 22, '#ffd75e');
+    else bossFan(e, aim, e.rage ? 3 : 1, 0.18, 220, 14, e.color);
   }
 
   function updateBullets(dt) {
@@ -1695,6 +1714,11 @@
     for (const b of G.ebullets) {
       b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
       if (b.life <= 0) { b.dead = true; continue; }
+      // La valla de la jaula frena los disparos de fuera (los de dentro sí pueden salir).
+      if (G.arena && !b.inA) {
+        const R = arenaR() + b.r;
+        if (dist2(b.x, b.y, G.arena.x, G.arena.y) < R * R) { b.dead = true; burst(b.x, b.y, b.color, 3, 80); continue; }
+      }
       for (const p of G.players) {
         if (!p.down && dist2(b.x, b.y, p.x, p.y) < (b.r + p.r) ** 2) {
           if (b.web && p.inv <= 0) p.slowT = 1.6;
