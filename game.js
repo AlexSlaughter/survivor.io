@@ -254,6 +254,8 @@
       weapons: [], passives: {},
       // Cada jugador tiene su propia experiencia y su propio nivel.
       level: 1, xp: 0, xpNext: 5, pending: 0, opts: null, optsSent: false,
+      // Una vez por partida se pueden volver a sortear las mejoras de una subida de nivel.
+      rerolls: 1,
     };
     const s = p.stats;
     // Personaje
@@ -340,6 +342,7 @@
     if (state === 'levelup') {
       const i = ['Digit1', 'Digit2', 'Digit3', 'Digit4'].indexOf(e.code);
       if (i >= 0) pickIndex(i);
+      if (e.code === 'KeyR') rerollPick();
     }
     if ((state === 'over' || state === 'win') && e.code === 'Enter' && !(e.target instanceof HTMLButtonElement)) retry();
   });
@@ -370,7 +373,7 @@
 
   const getPads = () => Array.from((navigator.getGamepads && navigator.getGamepads()) || []).filter(Boolean);
   const padPrev = [];
-  // Start pausa; A/B/X/Y eligen la mejora 1-4.
+  // Start pausa; A/B/X/Y eligen la mejora 1-4; RB vuelve a sortearlas.
   function pollPads() {
     getPads().forEach((pad, i) => {
       const now = pad.buttons.map(b => b.pressed), prev = padPrev[i] || [];
@@ -379,6 +382,7 @@
       if (hit(9)) togglePause();
       if (state === 'levelup') {
         for (let k = 0; k < 4; k++) if (hit(k)) { pickIndex(k); break; }
+        if (hit(5)) rerollPick();
       }
     });
   }
@@ -1104,7 +1108,7 @@
   }
 
   // Pinta las tarjetas de mejora (las usan el anfitrión y el invitado).
-  function renderChoices(titleHtml, descs, onPick) {
+  function renderChoices(titleHtml, descs, onPick, rerolls = 0) {
     $('lvTitle').innerHTML = titleHtml;
     const box = $('choices');
     box.innerHTML = '';
@@ -1118,6 +1122,13 @@
       b.addEventListener('click', () => onPick(i));
       box.appendChild(b);
     });
+    // Botón para volver a sortear (una vez por partida).
+    const rb = document.createElement('button');
+    rb.className = 'reroll';
+    rb.disabled = !(rerolls > 0);
+    rb.innerHTML = rerolls > 0 ? '🎲 Cambiar opciones <span class="key">R</span>' : '🎲 Cambio de opciones ya usado';
+    if (rerolls > 0) rb.addEventListener('click', () => rerollPick());
+    box.appendChild(rb);
     // Evita elegir sin querer con un toque que venía del juego.
     box.style.pointerEvents = 'none';
     setTimeout(() => { box.style.pointerEvents = ''; }, 250);
@@ -1153,12 +1164,12 @@
         if (p.idx === G.localIdx || p.gone) continue;
         const slot = G.slotOf[p.idx];
         if (p.opts) {
-          if (!p.optsSent) { p.optsSent = true; Net.sendTo(slot, { t: 'lvl', lv: p.level - p.pending + 1, opts: p.opts.map(o => describe(p, o)) }); }
+          if (!p.optsSent) { p.optsSent = true; Net.sendTo(slot, { t: 'lvl', lv: p.level - p.pending + 1, opts: p.opts.map(o => describe(p, o)), rr: p.rerolls }); }
         } else Net.sendTo(slot, { t: 'wait', who });
       }
       const me = G.p;
       if (me.opts) {
-        if (G.lvShown !== me.opts) { G.lvShown = me.opts; G.chooserP = me; renderChoices(lvlTitle(me), me.opts.map(o => describe(me, o)), pickIndex); }
+        if (G.lvShown !== me.opts) { G.lvShown = me.opts; G.chooserP = me; renderChoices(lvlTitle(me), me.opts.map(o => describe(me, o)), pickIndex, me.rerolls); }
       } else {
         G.lvShown = null;
         showWaiting(`Esperando a que ${listNames(choosing.map(p => G.names[p.idx]))} ${choosing.length > 1 ? 'elijan sus mejoras' : 'elija su mejora'}…`, PTEXT[choosing[0].idx]);
@@ -1168,7 +1179,29 @@
     const p = G.chooserP = choosing[0];
     if (G.lvShown === p.opts) return;
     G.lvShown = p.opts;
-    renderChoices(lvlTitle(p) + (G.coop ? ` <span class="sub">(${esc(p.ch.name)})</span>` : ''), p.opts.map(o => describe(p, o)), pickIndex);
+    renderChoices(lvlTitle(p) + (G.coop ? ` <span class="sub">(${esc(p.ch.name)})</span>` : ''), p.opts.map(o => describe(p, o)), pickIndex, p.rerolls);
+  }
+
+  // Vuelve a sortear las mejoras que se están eligiendo en esta pantalla (si aún le queda el cambio).
+  function rerollPick() {
+    if (state !== 'levelup' || !G) return;
+    if (G.online === 'guest') {
+      if (!G.guestOpts || !(G.guestRr > 0)) return;
+      Sound.play('click');
+      G.guestOpts = null; G.guestRr = 0;
+      Net.send({ t: 'reroll' });
+      showWaiting('Cambiando opciones…');
+      return;
+    }
+    reroll(G.online === 'host' ? G.p : G.chooserP);
+  }
+  function reroll(p) {
+    if (state !== 'levelup' || !p || !p.opts || !(p.rerolls > 0)) return;
+    if (p.idx === G.localIdx || !G.online) Sound.play('click');
+    p.rerolls--;
+    p.opts = buildOptions(p, p.choices);
+    p.optsSent = false;
+    showLevelUp();
   }
 
   // Elige la mejora i (teclas 1-4, botones del mando o toque), si le toca a esta pantalla.
@@ -4412,8 +4445,8 @@
         case 'lvl':
           if (state !== 'levelup') Sound.play('level');
           state = 'levelup'; releaseJoys();
-          G.guestOpts = m.opts;
-          renderChoices(`¡<span style="color:${PTEXT[G.localIdx]}">Subes al nivel ${m.lv || ''}</span>!`, m.opts, pickIndex);
+          G.guestOpts = m.opts; G.guestRr = +m.rr || 0;
+          renderChoices(`¡<span style="color:${PTEXT[G.localIdx]}">Subes al nivel ${m.lv || ''}</span>!`, m.opts, pickIndex, G.guestRr);
           break;
         case 'wait': {
           if (state !== 'levelup') Sound.play('level');
@@ -4434,6 +4467,7 @@
         case 'view': G.views[slot] = { vw: m.vw, vh: m.vh }; break;
         case 'pausereq': togglePause(); break;
         case 'pick': choose(G.players[idx], m.i); break;
+        case 'reroll': reroll(G.players[idx]); break;
       }
     }
   };

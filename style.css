@@ -176,6 +176,13 @@ button:disabled { opacity: .45; cursor: default; filter: grayscale(.4); }
 .card .lvl.new { color: var(--good); }
 .card .desc { font-size: 14px; font-weight: 400; color: var(--text-2); margin-top: 3px; }
 .card .hint { font-size: 12px; font-weight: 400; color: var(--pink); margin-top: 4px; }
+.reroll {
+  margin-top: 4px; padding: 10px; border-radius: 12px; border: 2px dashed var(--accent);
+  background: transparent; color: var(--text); font: inherit; font-weight: 700; cursor: pointer; position: relative;
+}
+.reroll:hover:not(:disabled) { background: var(--accent-soft); }
+.reroll:disabled { opacity: .45; cursor: default; border-style: solid; border-color: var(--text-3); }
+.reroll .key { margin-left: 8px; font-size: 11px; color: var(--text-3); }
 .card .key { position: absolute; top: 6px; right: 10px; font-size: 11px; color: var(--text-3); }
 
 /* En pantallas anchas las mejoras se muestran en fila */
