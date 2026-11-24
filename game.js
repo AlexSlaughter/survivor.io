@@ -1226,10 +1226,11 @@
   // El oro extra se cuenta una sola vez.
   function openChestTeam() {
     G.gold += 10;
-    for (const p of G.players) if (!p.gone) openChest(p);
+    G.players.filter(p => !p.gone).forEach((p, i) => openChest(p, i === 0 ? 10 : 0));
   }
-  function openChest(p) {
-    const goldBonus = 10;
+  // `goldBonus` solo sirve para el aviso: el oro ya lo suma openChestTeam una vez.
+  function openChest(p, goldBonus) {
+    const gt = goldBonus ? ` · +${goldBonus} 🪙` : '';
     const ev = p.weapons.find(w => canEvolve(p, w));
     if (ev) {
       ev.evolved = true;
@@ -1246,10 +1247,10 @@
     if (ups.length) {
       const o = pick(ups), d = describe(p, o);
       applyOption(p, o);
-      toast(`${ptag(p)}Cofre: ${d.icon} ${d.title} ${d.lvl} · +${goldBonus} 🪙`);
+      toast(`${ptag(p)}Cofre: ${d.icon} ${d.title} ${d.lvl}${gt}`);
     } else {
       heal(p, 50);
-      toast(`${ptag(p)}Cofre: +50 de vida · +${goldBonus} 🪙`);
+      toast(`${ptag(p)}Cofre: +50 de vida${gt}`);
     }
   }
 
