@@ -1288,9 +1288,9 @@
   function spawnEnemy(type, m = {}) {
     const t = ETYPES[type], map = G.map;
     const [x, y] = m.pos || spawnPos();
-    // Vida: x4,3 a los 5 min y x10 a los 10 min. Daño: +10% por minuto.
+    // Vida: x1,25 al empezar, x5,4 a los 5 min y x12,5 a los 10 min. Daño: +10% por minuto.
     const mins = G.time / 60;
-    const hs = (1 + mins * 0.4 + mins * mins * 0.05) * map.hp * G.diffHp;
+    const hs = 1.25 * (1 + mins * 0.4 + mins * mins * 0.05) * map.hp * G.diffHp;
     const ds = 1 + mins * 0.1;
     const e = {
       x, y, type, r: t.r * (m.size || 1), hp: t.hp * hs * (m.hp || 1), speed: t.speed * map.speed * (m.speed || 1),
@@ -1352,6 +1352,7 @@
     return false;
   }
 
+  const BOSS_REF_LVL = [16, 33, 54, 71];
   function spawnBoss(b) {
     if (!G.arena) openArena(b.color);
     const a = G.arena;
@@ -1359,7 +1360,11 @@
     const al = alive(), ref = al.length ? al[0] : G.players[0];
     const an = Math.atan2(a.y - ref.y, a.x - ref.x) + (Math.hypot(a.x - ref.x, a.y - ref.y) < 20 ? rand(0, TAU) : 0);
     const x = a.x + Math.cos(an) * a.R * 0.68, y = a.y + Math.sin(an) * a.R * 0.68;
-    const hp = b.hp * G.map.hp * G.diffBoss;
+    // La vida del jefe se adapta a lo fuertes que llegáis: el nivel medio comparado con el nivel
+    // habitual a esa altura de la partida (x0,9 si vais flojos, x1,5 normal, hasta x2,25 si vais sobrados).
+    const lv = al.length ? al.reduce((s, p) => s + p.level, 0) / al.length : 1;
+    const refLv = BOSS_REF_LVL[BOSSES.indexOf(b)] || 30;
+    const hp = b.hp * G.map.hp * G.diffBoss * 1.5 * Math.max(0.6, Math.min(1.5, lv / refLv));
     const e = {
       x, y, type: 'boss', r: b.r, hp, maxHp: hp, speed: b.speed * G.map.speed, dmg: b.dmg, xp: 60, color: b.color,
       flash: 0, kx: 0, ky: 0, slow: 0, frz: 0, boss: true, final: b.final, name: b.name, shots: b.shots,
@@ -1593,13 +1598,13 @@
 
   // Los jefes atacan más a menudo que antes (la jaula ya os protege de la horda) y, con la mitad
   // de la vida, se enfurecen: aún más rápidos, más proyectiles y se mueven más deprisa.
-  const BOSS_PACE = 1.25, BOSS_RAGE_PACE = 1.55;
+  const BOSS_PACE = 1.35, BOSS_RAGE_PACE = 1.75;
   function bossAI(e, dt, tg, ux, uy) {
     const aim = Math.atan2(uy, ux);
     if (!e.rage && e.hp < e.maxHp * 0.5) {
       e.rage = true;
-      if (e.speed) e.speed *= 1.15;
-      if (e.saveSpeed) e.saveSpeed *= 1.15;
+      if (e.speed) e.speed *= 1.25;
+      if (e.saveSpeed) e.saveSpeed *= 1.25;
       e.flash = 0.3; G.shake = Math.max(G.shake, 8);
       burst(e.x, e.y, e.color, 30, 220);
       toast(`💢 ¡${e.name} se enfurece!`);
@@ -2161,6 +2166,14 @@
     const t = G ? G.time : menuT;
     ctx.save();
     ctx.translate(e.x, e.y);
+    if (e.boss && e.rage) {
+      // Jefe enfurecido: aura roja que late.
+      const k = 0.5 + 0.5 * Math.sin(t * 9);
+      ctx.fillStyle = `rgba(255,40,60,${0.18 + 0.17 * k})`;
+      ctx.beginPath(); ctx.arc(0, 0, r * (1.35 + 0.15 * k), 0, TAU); ctx.fill();
+      ctx.strokeStyle = `rgba(255,90,90,${0.5 + 0.4 * k})`; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 0, r * (1.2 + 0.1 * k), 0, TAU); ctx.stroke();
+    }
     if (G && ctx === mainCtx && !e.boss && !e.warn && SPRITE_TYPES.has(e.type)) {
       const f = Math.floor((((e.wob % SPR_P) + SPR_P) % SPR_P) / SPR_P * SPR_N) % SPR_N;
       const s = enemySprite(e, r, f, e.flash > 0);
@@ -4404,7 +4417,7 @@
     for (const e of G.enemies) {
       if (e.dead || !near(e)) continue;
       // Formato compacto: id, tipo, x, y, banderas (golpeado, élite, jefe, final) y, solo para élites y jefes, radio y vida.
-      const f = (e.flash > 0 ? 1 : 0) | (e.elite ? 2 : 0) | (e.boss ? 4 : 0) | (e.final ? 8 : 0) | (isWarn(e) ? 16 : 0);
+      const f = (e.flash > 0 ? 1 : 0) | (e.elite ? 2 : 0) | (e.boss ? 4 : 0) | (e.final ? 8 : 0) | (isWarn(e) ? 16 : 0) | (e.rage ? 32 : 0);
       const row = [e.id, ETYPE_IDX[e.type], R(e.x), R(e.y), f];
       if (e.elite || e.boss) row.push(r1(e.r), Math.round(e.hp / e.maxHp * 100) / 100);
       if (e.boss) row.push(e.variant, Math.round((e.ca || 0) * 100) / 100);
@@ -4489,7 +4502,7 @@
       if (!e) { e = { id, x, y, wob: rand(0, TAU), flash: 0 }; G.emap.set(id, e); }
       e.px = e.x; e.py = e.y; e.tx = x; e.ty = y;
       if (dist2(e.x, e.y, x, y) > 300 * 300) { e.px = x; e.py = y; }
-      e.type = ETYPE_IDS[ti]; e.elite = !!(f & 2); e.boss = !!(f & 4); e.final = !!(f & 8); e.warn = !!(f & 16);
+      e.type = ETYPE_IDS[ti]; e.elite = !!(f & 2); e.boss = !!(f & 4); e.final = !!(f & 8); e.warn = !!(f & 16); e.rage = !!(f & 32);
       e.variant = variant ?? -1; e.ca = ca || 0;
       e.r = r || ETYPES[e.type].r;
       if (f & 1) e.flash = 0.08;

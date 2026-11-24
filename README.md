@@ -93,7 +93,7 @@ Daño por segundo aproximado a cada enemigo, sin bonificaciones. Las armas de á
 | 🌀 Cuchillas (cuerpo a cuerpo) | 8 | 38 | 69 | 165 |
 | 🔥 Halo (todo alrededor) | 10 | 22 | 34 | 102 (y ralentiza) |
 
-Los enemigos ganan vida cada vez más rápido (×4 a los 5 minutos y ×10 a los 10) y +10% de daño por minuto. Jefes: Reina Araña 1000 de vida, Coloso de Obsidiana 6000, Dragón de Hueso 12000 y Rey del Abismo 20000.
+Los enemigos ganan vida cada vez más rápido (×1,25 al empezar, ×5,4 a los 5 minutos y ×12,5 a los 10) y +10% de daño por minuto. Jefes (vida base): Reina Araña 1000, Coloso de Obsidiana 6000, Dragón de Hueso 12000 y Rey del Abismo 20000; se multiplica entre ×0,9 y ×2,25 según vuestro nivel al llegar (×1,5 con el nivel habitual). Enfurecidos, los jefes brillan en rojo.
 
 ### Personajes
 
