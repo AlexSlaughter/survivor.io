@@ -87,17 +87,20 @@ window.Cloud = (() => {
   C.rooms = {
     create: (code, data) => fb.setDoc(room(code), Object.assign({}, data, { host: C.user.uid, created: fb.serverTimestamp() })),
     get: async code => { const s = await fb.getDoc(room(code)); return s.exists() ? s.data() : null; },
-    // Ocupa la primera plaza libre de la sala de forma atómica (dos invitados no pueden quedarse la misma).
+    // Ocupa una plaza de forma atómica (dos invitados no pueden quedarse la misma). Si este
+    // jugador ya tenía una plaza (un intento anterior que falló), la reutiliza en vez de gastar otra.
     claim: code => fb.runTransaction(db, async tx => {
       const snap = await tx.get(room(code));
       if (!snap.exists()) throw Object.assign(new Error('No existe esa sala'), { code: 'room/not-found' });
       const slots = snap.data().slots || {};
-      const k = ['1', '2', '3'].find(n => slots[n] && !slots[n].guest);
+      const k = ['1', '2', '3'].find(n => slots[n] && slots[n].guest === C.user.uid)
+        || ['1', '2', '3'].find(n => slots[n] && !slots[n].guest);
       if (!k) throw Object.assign(new Error('Sala llena'), { code: 'room/full' });
-      tx.update(room(code), { [`slots.${k}.guest`]: C.user.uid });
-      return { slot: k, offer: slots[k].offer };
+      tx.update(room(code), { [`slots.${k}`]: { guest: C.user.uid } });
+      return { slot: k };
     }),
-    answer: (code, slot, answer) => fb.updateDoc(room(code), { [`slots.${slot}.answer`]: answer }),
+    offer: (code, slot, offer) => fb.updateDoc(room(code), { [`slots.${slot}.offer`]: offer }),
+    answer: (code, slot, answer, to) => fb.updateDoc(room(code), { [`slots.${slot}.answer`]: answer, [`slots.${slot}.answerTo`]: to }),
     watch: (code, cb) => fb.onSnapshot(room(code), s => cb(s.exists() ? s.data() : null), err => cb(null, err)),
     remove: code => fb.deleteDoc(room(code)),
   };
