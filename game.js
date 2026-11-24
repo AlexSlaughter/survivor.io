@@ -1222,9 +1222,14 @@
     showLevelUp();
   }
 
+  // Los cofres (de élites y jefes) mejoran a todo el equipo: cada jugador recibe su propia mejora.
+  // El oro extra se cuenta una sola vez.
+  function openChestTeam() {
+    G.gold += 10;
+    for (const p of G.players) if (!p.gone) openChest(p);
+  }
   function openChest(p) {
     const goldBonus = 10;
-    G.gold += goldBonus;
     const ev = p.weapons.find(w => canEvolve(p, w));
     if (ev) {
       ev.evolved = true;
@@ -1658,7 +1663,7 @@
         for (const c of G.pickups) if (c.type === 'moneda') c.mag = true;
         sfx('chest');
         toast('🧲 ¡Todos los cristales vienen a ti!');
-      } else if (k.type === 'cofre') openChest(p);
+      } else if (k.type === 'cofre') openChestTeam();
       else if (k.type === 'moneda') { G.gold += k.v; G.coins--; sfx('coin', 0.05); }
     }
   }
