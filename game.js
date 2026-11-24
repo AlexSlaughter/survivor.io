@@ -296,10 +296,10 @@
       boss: null, opts: [], map, gold: 0, coins: 0, bossKills: 0,
       coop, players, p: players[0], cx: 0, cy: 0,
       kills: 0, chooserP: null, lvShown: null,
-      // Con más jugadores aparecen bastantes más enemigos (cada uno sube de nivel con lo que recoge),
-      // algo más resistentes, y los jefes aguantan más.
-      diffHp: 1 + 0.1 * (n - 1), diffRate: 1 + 0.55 * (n - 1), diffBoss: 1 + 0.6 * (n - 1),
-      maxEnemies: 380 + 100 * (n - 1),
+      // Con más jugadores aparecen algo más de enemigos (cada uno sube de nivel con lo que recoge),
+      // un poco más resistentes, y los jefes aguantan más.
+      diffHp: 1 + 0.1 * (n - 1), diffRate: 1 + 0.25 * (n - 1), diffBoss: 1 + 0.6 * (n - 1),
+      maxEnemies: 380 + 40 * (n - 1),
       online: online ? 'host' : null, localIdx: 0, names: online ? online.names : null,
       remote: {}, views: online ? online.views : {}, slotOf: [], idxOf: {},
       eid: 0, netEvents: [], netT: 0,
@@ -1291,8 +1291,8 @@
     }
     if (t >= G.nextSwarm) {
       G.nextSwarm += 45;
-      // Un enjambre alrededor de cada jugador en pie.
-      const n = 16 + Math.floor(t / 30);
+      // Un enjambre alrededor de cada jugador en pie (más pequeño si hay varios).
+      const n = Math.round((16 + Math.floor(t / 30)) * (G.players.length > 1 ? 0.6 : 1));
       const type = t > 240 ? 'espectro' : 'murcielago';
       const d = Math.hypot(VW, VH) / 2 + 40;
       for (const c of alive()) {
