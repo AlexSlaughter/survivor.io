@@ -1081,7 +1081,26 @@
     const owned = Object.keys(p.passives);
     for (const id of owned) if (p.passives[id] < PASSIVES[id].max) o.push({ k: 'p', id });
     if (owned.length < SLOTS) for (const id in PASSIVES) if (!p.passives[id]) o.push({ k: 'np', id });
-    const r = shuffle(o).slice(0, count);
+    // Sorteo ponderado: lo que salió en la subida anterior (o antes de cambiar opciones) pesa menos,
+    // para que no se repitan siempre las mismas, y se intenta mezclar armas y pasivas.
+    const key = q => (q.k === 'w' || q.k === 'nw' ? 'w:' : 'p:') + q.id;
+    const recent = p.recentOpts || {};
+    const isW = q => q.k === 'w' || q.k === 'nw';
+    const pool = shuffle(o).map(q => ({ q, wt: recent[key(q)] ? 0.3 : 1 }));
+    const r = [];
+    while (r.length < count && pool.length) {
+      // Si ya hay 2 del mismo tipo y quedan del otro, el siguiente es del otro tipo.
+      const nW = r.filter(isW).length, nP = r.length - nW;
+      let cand = pool;
+      if (nW >= 2 && pool.some(c => !isW(c.q))) cand = pool.filter(c => !isW(c.q));
+      else if (nP >= 2 && pool.some(c => isW(c.q))) cand = pool.filter(c => isW(c.q));
+      let x = Math.random() * cand.reduce((a, c) => a + c.wt, 0), ch = cand[cand.length - 1];
+      for (const c of cand) { x -= c.wt; if (x <= 0) { ch = c; break; } }
+      r.push(ch.q);
+      pool.splice(pool.indexOf(ch), 1);
+    }
+    p.recentOpts = {};
+    for (const q of r) p.recentOpts[key(q)] = true;
     if (!r.length) r.push({ k: 'heal' });
     return r;
   }
