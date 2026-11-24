@@ -154,7 +154,7 @@ window.HN_DATA = {
     calabaza:   { hp: 22, speed: 84,  dmg: 4,  r: 13, xp: 2, color: '#ff9a3c',
       bomb: { range: 48, fuse: 0.9, R: 72, dmg: 20 } },
     // Lento, enorme y muy resistente; casi no se le puede empujar.
-    golem:      { hp: 260, speed: 30, dmg: 24, r: 24, xp: 10, color: '#9b97ad', heavy: true },
+    golem:      { hp: 200, speed: 30, dmg: 20, r: 24, xp: 10, color: '#9b97ad', heavy: true },
     // Se queda lejos e invoca arañas cada pocos segundos: ve a por él.
     invocador:  { hp: 80, speed: 44,  dmg: 10, r: 15, xp: 6, color: '#5fe0c0',
       summon: { range: 290, cd: 6, n: 3, type: 'arana' } },
@@ -169,9 +169,9 @@ window.HN_DATA = {
   // ai: 'ring' (anillos de proyectiles), 'summon' (invoca crías y lanza telarañas que ralentizan),
   // 'charge' (embiste tras avisar y escupe fuego en abanico), 'king' (anillos y ráfagas dirigidas).
   BOSSES: [
-    { at: 150, name: 'Reina Araña',         hp: 1200,  r: 32, speed: 68, dmg: 18, color: '#cfd2e0', shots: 8,  ai: 'summon', final: false },
-    { at: 300, name: 'Coloso de Obsidiana', hp: 5000,  r: 38, speed: 52, dmg: 25, color: '#8a5cff', shots: 12, ai: 'ring',   final: false },
-    { at: 450, name: 'Dragón de Hueso',     hp: 10000, r: 42, speed: 56, dmg: 30, color: '#ff9a3d', shots: 7,  ai: 'charge', final: false },
+    { at: 150, name: 'Reina Araña',         hp: 1000,  r: 32, speed: 68, dmg: 18, color: '#cfd2e0', shots: 8,  ai: 'summon', final: false },
+    { at: 300, name: 'Coloso de Obsidiana', hp: 6000,  r: 38, speed: 52, dmg: 25, color: '#8a5cff', shots: 12, ai: 'ring',   final: false },
+    { at: 450, name: 'Dragón de Hueso',     hp: 12000, r: 42, speed: 56, dmg: 30, color: '#ff9a3d', shots: 7,  ai: 'charge', final: false },
     { at: 600, name: 'Rey del Abismo',      hp: 20000, r: 48, speed: 60, dmg: 35, color: '#ff3d7f', shots: 18, ai: 'king',   final: true },
   ],
 

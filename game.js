@@ -651,7 +651,7 @@
       const n = 5 + (w.lvl >= 3 ? 1 : 0) + (w.lvl >= 5 ? 1 : 0) + s.proj * 2, a = aimAt(p, t);
       for (let i = 0; i < n; i++) {
         shootBala(p, a + spreadA(i, n, 0.6 / (n - 1)) + rand(-0.04, 0.04),
-          { spd: 650 * rand(0.9, 1.1), r: 3.5, dmg: 9 * mainMul(w) * s.dmg, life: 0.34, color: '#ffd27a', kb: 260 });
+          { spd: 650 * rand(0.9, 1.1), r: 3.5, dmg: 11 * mainMul(w) * s.dmg, life: 0.34, color: '#ffd27a', kb: 260 });
       }
       G.shake = Math.max(G.shake, 2);
       sfx('shotgun', 0.1);
@@ -663,7 +663,7 @@
       if (!t) { w.t = 0.1; return; }
       w.t = (0.13 - 0.008 * (w.lvl - 1)) * s.cd;
       const n = 1 + s.proj, a = aimAt(p, t);
-      for (let i = 0; i < n; i++) shootBala(p, a + spreadA(i, n, 0.15) + rand(-0.14, 0.14), { spd: 650, r: 3, dmg: 5 * mainMul(w) * s.dmg, life: 0.7, color: '#bfe9ff', kb: 40 });
+      for (let i = 0; i < n; i++) shootBala(p, a + spreadA(i, n, 0.15) + rand(-0.14, 0.14), { spd: 650, r: 3, dmg: 7 * mainMul(w) * s.dmg, life: 0.7, color: '#bfe9ff', kb: 40 });
       sfx('smg', 0.07);
     },
     francotirador(w, dt, p, s) {
@@ -678,7 +678,7 @@
       const n = 1 + s.proj;
       for (let i = 0; i < n; i++) {
         const t = cand[i % cand.length];
-        shootBala(p, aimAt(p, t), { spd: 1400, r: 5, dmg: 87 * mainMul(w) * s.dmg, life: 0.65, pierce: 99, color: '#9dffef', kb: 220 });
+        shootBala(p, aimAt(p, t), { spd: 1400, r: 5, dmg: 98 * mainMul(w) * s.dmg, life: 0.65, pierce: 99, color: '#9dffef', kb: 220 });
       }
       G.shake = Math.max(G.shake, 3);
       sfx('sniper', 0.1);
@@ -762,7 +762,7 @@
         const a = base + spreadA(i, n, 0.5);
         G.bullets.push({
           kind: 'disco', skin: 'shield', ev: false, owner: p, x: p.x, y: p.y, vx: Math.cos(a), vy: Math.sin(a), spd: 560,
-          t: 0, out: 0.55, r: 15 * Math.sqrt(s.area), dmg: 45 * mainMul(w) * s.dmg, hits: new Map(), life: 5, rot: 0,
+          t: 0, out: 0.55, r: 15 * Math.sqrt(s.area), dmg: 38 * mainMul(w) * s.dmg, hits: new Map(), life: 5, rot: 0,
         });
       }
       sfx('disc', 0.1);
@@ -873,7 +873,7 @@
       if (!t) { w.t = 0.2; return; }
       w.t = (1.5 - 0.06 * (w.lvl - 1)) * s.cd;
       const n = 1 + s.proj, a = aimAt(p, t), r = (15 + (w.lvl >= 3 ? 4 : 0) + (w.lvl >= 5 ? 4 : 0)) * Math.sqrt(s.area);
-      for (let i = 0; i < n; i++) shootBala(p, a + spreadA(i, n, 0.25), { spd: 600, r, dmg: 104 * mainMul(w) * s.dmg, life: 1.4, pierce: 99, color: '#7fdbff', kb: 200, shape: 'ki' });
+      for (let i = 0; i < n; i++) shootBala(p, a + spreadA(i, n, 0.25), { spd: 600, r, dmg: 88 * mainMul(w) * s.dmg, life: 1.4, pierce: 99, color: '#7fdbff', kb: 200, shape: 'ki' });
       G.shake = Math.max(G.shake, 3);
       sfx('sniper', 0.1);
     },
@@ -888,7 +888,7 @@
       const targets = nearest(p.x, p.y, n, 520);
       if (!targets.length) { w.t = 0.15; return; }
       w.t = (ev ? 0.55 : 1.1 - lv * 0.07) * s.cd;
-      const dmg = (10 + 4 * lv) * (ev ? 1.8 : 1) * s.dmg;
+      const dmg = (12 + 5 * lv) * (ev ? 1.8 : 1) * s.dmg;
       const spd = ev ? 560 : 440;
       for (let i = 0; i < n; i++) {
         const t = targets[i % targets.length];
@@ -983,7 +983,7 @@
       const lv = w.lvl, ev = w.evolved;
       w.t = (ev ? 0.32 : 0.62 - lv * 0.04) * s.cd;
       const n = (ev ? 5 : [1, 2, 2, 2, 3][lv - 1]) + s.proj;
-      const dmg = (7 + 3 * lv) * (ev ? 1.5 : 1) * s.dmg, a = Math.atan2(p.face.y, p.face.x);
+      const dmg = (9 + 4 * lv) * (ev ? 1.5 : 1) * s.dmg, a = Math.atan2(p.face.y, p.face.x);
       for (let i = 0; i < n; i++) {
         // Las dagas salen en paralelo, separadas unos píxeles, hacia donde mira el jugador.
         const off = spreadA(i, n, 9), ox = -Math.sin(a) * off, oy = Math.cos(a) * off;
@@ -1361,7 +1361,7 @@
     const x = a.x + Math.cos(an) * a.R * 0.68, y = a.y + Math.sin(an) * a.R * 0.68;
     const hp = b.hp * G.map.hp * G.diffBoss;
     const e = {
-      x, y, type: 'boss', r: b.r, hp, maxHp: hp, speed: b.speed * G.map.speed * 1.15, dmg: b.dmg, xp: 60, color: b.color,
+      x, y, type: 'boss', r: b.r, hp, maxHp: hp, speed: b.speed * G.map.speed, dmg: b.dmg, xp: 60, color: b.color,
       flash: 0, kx: 0, ky: 0, slow: 0, frz: 0, boss: true, final: b.final, name: b.name, shots: b.shots,
       ai: b.ai || 'ring', variant: BOSSES.indexOf(b), shotT: 3, sumT: 2, chT: 4, mode: 0, wob: 0, phase: 0, inA: true,
     };
@@ -1593,13 +1593,13 @@
 
   // Los jefes atacan más a menudo que antes (la jaula ya os protege de la horda) y, con la mitad
   // de la vida, se enfurecen: aún más rápidos, más proyectiles y se mueven más deprisa.
-  const BOSS_PACE = 1.3, BOSS_RAGE_PACE = 1.65;
+  const BOSS_PACE = 1.25, BOSS_RAGE_PACE = 1.55;
   function bossAI(e, dt, tg, ux, uy) {
     const aim = Math.atan2(uy, ux);
     if (!e.rage && e.hp < e.maxHp * 0.5) {
       e.rage = true;
-      if (e.speed) e.speed *= 1.2;
-      if (e.saveSpeed) e.saveSpeed *= 1.2;
+      if (e.speed) e.speed *= 1.15;
+      if (e.saveSpeed) e.saveSpeed *= 1.15;
       e.flash = 0.3; G.shake = Math.max(G.shake, 8);
       burst(e.x, e.y, e.color, 30, 220);
       toast(`💢 ¡${e.name} se enfurece!`);
