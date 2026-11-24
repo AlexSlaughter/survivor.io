@@ -10,7 +10,8 @@ Sobrevive 10 minutos a oleadas cada vez más grandes de monstruos y derrota al *
 - **Atacar:** automático; tus armas disparan solas.
 - **Subir de nivel:** recoge los cristales que sueltan los enemigos y elige 1 de 3 mejoras.
 - **Evolucionar:** lleva un arma a **Nv. 5**, consigue su objeto clave y abre un **cofre** (lo sueltan élites y jefes).
-- **Pausa:** `P` / `Esc` o el botón ❚❚.
+- **Pausa:** `P` / `Esc` o el botón ❚❚. Al continuar hay una cuenta atrás de 3 segundos.
+- **Jaula del jefe:** cuando aparece un jefe se cierra un círculo de estacas a vuestro alrededor. No se puede salir: dentro solo estáis vosotros, el jefe y lo que invoque, y la horda espera fuera. La jaula se abre al derrotarlo.
 
 ### Cooperativo local (2 jugadores)
 

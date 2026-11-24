@@ -224,7 +224,7 @@
   // Versiones más oscuras de los colores de jugador para los textos de los menús (fondo claro).
   const PTEXT = ['#3f8fb3', '#c9628f', '#b0841f', '#3a9a6c'];
   let G = null;
-  let state = 'menu'; // menu | play | levelup | paused | over | win
+  let state = 'menu'; // menu | play | levelup | paused | countdown | over | win
 
   // Suma las bonificaciones del equipo puesto. Cada nivel añade un 50% del valor base.
   const itemValue = (v, lvl) => v * (1 + 0.5 * (lvl - 1));
@@ -295,7 +295,7 @@
     for (let i = 0; i < n; i++) players.push(makePlayer(charById(chars[i]), i, coop ? (i - (n - 1) / 2) * 60 : 0, ups[i], gears[i]));
     G = {
       time: 0, spawnAcc: 0, nextElite: 60, nextSwarm: 45, bossIdx: 0, shake: 0, pending: 0,
-      boss: null, opts: [], map, gold: 0, coins: 0, bossKills: 0,
+      boss: null, arena: null, opts: [], map, gold: 0, coins: 0, bossKills: 0,
       coop, players, p: players[0], cx: 0, cy: 0,
       kills: 0, chooserP: null, lvShown: null,
       // Con más jugadores aparecen algo más de enemigos (cada uno sube de nivel con lo que recoge),
@@ -349,7 +349,7 @@
   addEventListener('keyup', e => { keys[e.code] = false; });
   addEventListener('blur', () => { for (const k in keys) keys[k] = false; releaseJoys(); });
   canvas.addEventListener('pointerdown', e => {
-    if (state !== 'play') return;
+    if (state !== 'play' && state !== 'countdown') return;
     // En cooperativo local, cada jugador usa su mitad de la pantalla partida.
     const second = splitSide() ? e.clientX >= W / 2 : e.clientY >= H / 2;
     const j = joys[G.coop && !G.online && second ? 1 : 0];
@@ -528,7 +528,11 @@
       if (G.boss === e) G.boss = G.enemies.find(o => o.boss && !o.dead) || null;
       G.shake = 14; G.bossKills++;
       if (e.final) endGame(true);
-      else toast(`¡Has derrotado a ${e.name}!`);
+      else {
+        const was = !!G.arena;
+        closeArenaIfDone();
+        toast(`¡Has derrotado a ${e.name}!${was && !G.arena ? ' 🔓 La jaula se abre' : ''}`);
+      }
     }
   }
 
@@ -1282,24 +1286,60 @@
     if (t.heavy) e.heavy = true;
     e.maxHp = e.hp;
     e.id = ++G.eid;
+    e.inA = !!G.arena && inArena(e.x, e.y);
     G.enemies.push(e);
     return e;
   }
 
+  // ---------- Jaula del jefe ----------
+  // Al aparecer un jefe se cierra un círculo de estacas alrededor de los jugadores: dentro solo quedáis
+  // vosotros, el jefe y lo que él invoque; la horda espera fuera. Se abre cuando no queda ningún jefe vivo.
+  const ARENA_CLOSE = 0.9;
+  function arenaR(a = G.arena) { const k = Math.min(1, a.t / ARENA_CLOSE); return a.R * (1 + (1 - k) * (1 - k) * 1.2); }
+  function inArena(x, y, pad = 0) { const a = G.arena; return a && dist2(x, y, a.x, a.y) < (arenaR() - pad) ** 2; }
+  function openArena(color) {
+    const al = alive().length ? alive() : G.players.filter(p => !p.gone);
+    const cx = al.reduce((s, p) => s + p.x, 0) / al.length, cy = al.reduce((s, p) => s + p.y, 0) / al.length;
+    const spread = Math.max(0, ...al.map(p => Math.hypot(p.x - cx, p.y - cy)));
+    const R = Math.min(620, Math.max(Math.min(VW, VH) * 0.46, 230, spread + 90));
+    G.arena = { x: cx, y: cy, R, t: 0, color };
+    // Lo que ya estaba dentro sale despedido hacia fuera (los élites también).
+    for (const e of G.enemies) if (!e.boss) e.inA = false;
+  }
+  function closeArenaIfDone() {
+    if (!G.arena || G.enemies.some(o => o.boss && !o.dead)) return;
+    const a = G.arena, R = arenaR();
+    for (let i = 0; i < 24; i++) { const an = i / 24 * TAU; burst(a.x + Math.cos(an) * R, a.y + Math.sin(an) * R, a.color, 4, 120); }
+    G.arena = null;
+    for (const e of G.enemies) e.inA = false;
+  }
+  // Mantiene a cada uno en su lado de la valla.
+  function arenaKeep(o, inside) {
+    const a = G.arena, R = arenaR(), dx = o.x - a.x, dy = o.y - a.y, d = Math.hypot(dx, dy) || 0.01;
+    if (inside) { const m = R - o.r - 4; if (d > m) { o.x = a.x + dx / d * m; o.y = a.y + dy / d * m; return true; } }
+    else { const m = R + o.r + 4; if (d < m) { const nd = Math.min(m, d + 700 * (1 / 60)); o.x = a.x + dx / d * nd; o.y = a.y + dy / d * nd; } }
+    return false;
+  }
+
   function spawnBoss(b) {
-    const [x, y] = spawnPos();
+    if (!G.arena) openArena(b.color);
+    const a = G.arena;
+    // Aparece dentro de la jaula, en el lado contrario al de los jugadores.
+    const al = alive(), ref = al.length ? al[0] : G.players[0];
+    const an = Math.atan2(a.y - ref.y, a.x - ref.x) + (Math.hypot(a.x - ref.x, a.y - ref.y) < 20 ? rand(0, TAU) : 0);
+    const x = a.x + Math.cos(an) * a.R * 0.68, y = a.y + Math.sin(an) * a.R * 0.68;
     const hp = b.hp * G.map.hp * G.diffBoss;
     const e = {
       x, y, type: 'boss', r: b.r, hp, maxHp: hp, speed: b.speed * G.map.speed, dmg: b.dmg, xp: 60, color: b.color,
       flash: 0, kx: 0, ky: 0, slow: 0, frz: 0, boss: true, final: b.final, name: b.name, shots: b.shots,
-      ai: b.ai || 'ring', variant: BOSSES.indexOf(b), shotT: 3, sumT: 2, chT: 4, mode: 0, wob: 0, phase: 0,
+      ai: b.ai || 'ring', variant: BOSSES.indexOf(b), shotT: 3, sumT: 2, chT: 4, mode: 0, wob: 0, phase: 0, inA: true,
     };
     e.id = ++G.eid;
     G.enemies.push(e);
     G.boss = e;
     G.shake = 10;
     sfx('boss');
-    toast(`⚠ ${b.name} se acerca`);
+    toast(`⚠ ${b.name} · 🔒 ¡Jaula cerrada! Derrótalo para salir`);
   }
 
   function spawner(dt) {
@@ -1384,6 +1424,10 @@
       p.inv -= dt; p.slowT = (p.slowT || 0) - dt;
       if (p.stats.regen) p.hp = Math.min(p.maxHp, p.hp + p.stats.regen * dt);
     }
+    if (G.arena) {
+      G.arena.t += dt;
+      for (const p of G.players) if (!p.gone) arenaKeep(p, true);
+    }
     // Punto de referencia (para la mirada de los enemigos): el jugador de esta pantalla.
     G.cx = G.p.x; G.cy = G.p.y;
   }
@@ -1463,6 +1507,7 @@
         if (!p.down && dist2(e.x, e.y, p.x, p.y) < (e.r + p.r) ** 2) damagePlayer(p, e.dmg);
       }
       if (e.boss) bossAI(e, dt, tg, dx / d, dy / d, d);
+      if (G.arena) arenaKeep(e, e.inA);
     }
   }
 
@@ -3086,6 +3131,42 @@
   }
 
   // Lo que va pegado al suelo (debajo de los enemigos): charcos de veneno y sombras de meteoros.
+  // Jaula del jefe: el exterior se oscurece y una valla de estacas con brasas rodea el círculo.
+  function drawArena() {
+    const a = G.arena;
+    if (!a) return;
+    const R = arenaR(a), k = Math.min(1, a.t / ARENA_CLOSE), pulse = 0.75 + Math.sin(G.time * 4) * 0.25;
+    ctx.save();
+    ctx.globalAlpha = k;
+    ctx.fillStyle = 'rgba(2,1,8,.55)';
+    ctx.beginPath(); ctx.rect(camX - 10, camY - 10, CVW + 20, CVH + 20); ctx.arc(a.x, a.y, R, 0, TAU, true); ctx.fill('evenodd');
+    // Suelo de la arena iluminado desde el borde con el color del jefe.
+    const gl = ctx.createRadialGradient(a.x, a.y, R * 0.55, a.x, a.y, R);
+    gl.addColorStop(0, 'rgba(0,0,0,0)'); gl.addColorStop(1, a.color);
+    ctx.globalAlpha = k * 0.16;
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(a.x, a.y, R, 0, TAU); ctx.fill();
+    ctx.globalAlpha = k;
+    ctx.strokeStyle = a.color; ctx.lineWidth = 10; ctx.globalAlpha = k * 0.18 * pulse;
+    ctx.beginPath(); ctx.arc(a.x, a.y, R, 0, TAU); ctx.stroke();
+    ctx.lineWidth = 2.5; ctx.globalAlpha = k * 0.7;
+    ctx.beginPath(); ctx.arc(a.x, a.y, R, 0, TAU); ctx.stroke();
+    // Estacas (solo las que se ven).
+    const n = Math.max(24, Math.round(TAU * R / 34)), H_ = 24;
+    ctx.globalAlpha = k;
+    for (let i = 0; i < n; i++) {
+      const an = i / n * TAU + (1 - k) * 1.5, x = a.x + Math.cos(an) * R, y = a.y + Math.sin(an) * R;
+      if (!inView(x, y, 40)) continue;
+      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(x, y + 1, 6, 2.5, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#2a2236';
+      ctx.beginPath(); ctx.moveTo(x - 3.5, y); ctx.lineTo(x - 3.5, y - H_); ctx.lineTo(x, y - H_ - 7); ctx.lineTo(x + 3.5, y - H_); ctx.lineTo(x + 3.5, y); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(x - 3.5, y - H_, 1.5, H_);
+      ctx.fillStyle = a.color; ctx.globalAlpha = k * pulse;
+      ctx.beginPath(); ctx.arc(x, y - H_ - 3, 2.2, 0, TAU); ctx.fill();
+      ctx.globalAlpha = k;
+    }
+    ctx.restore();
+  }
+
   function drawGroundFx() {
     for (const b of G.bullets) {
       if (b.kind !== 'charco' && b.kind !== 'meteoro') continue;
@@ -3312,7 +3393,7 @@
     }
 
     // Joysticks táctiles
-    if (state === 'play') {
+    if (state === 'play' || state === 'countdown') {
       joys.forEach((j, i) => {
         if (!j.active) return;
         const jx = j.x - j.ox, jy = j.y - j.oy, l = Math.hypot(jx, jy), m = Math.min(l, JR);
@@ -3649,6 +3730,7 @@
       ctx.translate(-camX, -camY);
       drawGround();
       drawGroundFx();
+      drawArena();
       drawWeaponsWorld();
       drawGems();
       drawPickups();
@@ -3747,6 +3829,14 @@
     c.className = 'preview'; c.width = src.width; c.height = src.height;
     c.getContext('2d').drawImage(src, 0, 0);
     return c;
+  }
+
+  function resetGfx() {
+    sprites.clear(); sprK = 0;
+    moonC = null; moonKey = '';
+    PORTAL.sky = null; PORTAL.skyKey = '';
+    previews.clear();
+    resize();
   }
 
   function bump(el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); Sound.play('error'); }
@@ -4250,6 +4340,7 @@
     const snap = {
       t: 's', time: G.time, k: G.kills, g: G.gold, sh: r1(G.shake),
       b: G.boss && !G.boss.dead ? [G.boss.name, R(G.boss.hp), R(G.boss.maxHp), G.boss.color] : 0,
+      ar: G.arena ? [R(G.arena.x), R(G.arena.y), R(G.arena.R), G.arena.color, r1(G.arena.t)] : 0,
       p: G.players.map(p => [r1(p.x), r1(p.y), r1(p.hp), p.maxHp, p.down ? 1 : 0, r1(p.reviveT), r1(p.face.x), r1(p.face.y),
         p.side, r1(p.walk), r1(p.inv), p.revives, Math.round(p.stats.speed * (p.slowT > 0 ? 0.55 : 1) * 100) / 100,
         p.weapons.map(w => [w.id, w.lvl, w.evolved ? 1 : 0, Math.round(w.angle * 100) / 100, w.n || 0, r1(w.R || 0), r1(w.br || 0)]),
@@ -4294,7 +4385,7 @@
     const n = m.chars.length;
     G = {
       online: 'guest', localIdx: m.you || 1, coop: true, map: mapById(m.map), names: m.names,
-      time: 0, kills: 0, gold: 0, shake: 0, boss: null, cx: 0, cy: 0,
+      time: 0, kills: 0, gold: 0, shake: 0, boss: null, arena: null, cx: 0, cy: 0,
       players: m.chars.map((c, i) => viewPlayer(charById(c), i, (i - (n - 1) / 2) * 60)),
       enemies: [], emap: new Map(), bullets: [], ebullets: [], gems: [], pickups: [], particles: [], texts: [], effects: [],
       snapT: performance.now(), snapDt: 0.05, sendT: 0, guestOpts: null, opts: [],
@@ -4311,6 +4402,11 @@
     G.time = sn.time; G.kills = sn.k; G.gold = sn.g;
     G.shake = Math.max(G.shake, sn.sh || 0);
     G.boss = sn.b ? { name: sn.b[0], hp: sn.b[1], maxHp: sn.b[2], color: sn.b[3], dead: false } : null;
+    if (sn.ar) {
+      const [x, y, R, color, t] = sn.ar;
+      if (!G.arena) G.arena = { x, y, R, color, t };
+      Object.assign(G.arena, { x, y, R, color });
+    } else G.arena = null;
     sn.p.forEach((v, i) => {
       const p = G.players[i];
       if (!p) return;
@@ -4396,10 +4492,12 @@
     for (const q of G.pickups) q.t += dt;
 
     const me = G.players[G.localIdx];
+    if (G.arena) G.arena.t += dt;
     if (state === 'play' && !me.down) {
       const { dx, dy } = inputDir(G.localIdx);
       const sp = 170 * me.stats.speed;
       me.x += dx * sp * dt; me.y += dy * sp * dt;
+      if (G.arena) arenaKeep(me, true);
       if (dx || dy) {
         const l = Math.hypot(dx, dy);
         me.face = { x: dx / l, y: dy / l };
@@ -4463,6 +4561,7 @@
         }
         case 'go': if (state === 'levelup') { state = 'play'; showOnly(null); } break;
         case 'paused': guestSetPaused(m.on); break;
+        case 'resume': if (state === 'paused') startCountdown(); break;
         case 'end': guestEnd(m); break;
       }
     } else if (G.online === 'host') {
@@ -4670,7 +4769,7 @@
 
   function toMenu() {
     if (Net.role) leaveOnline();
-    G = null; state = 'menu';
+    G = null; state = 'menu'; showCountdown(0);
     Sound.stopMusic(); Sound.resume();
     $('pauseBtn').classList.add('hidden');
     $('retryBtn').classList.remove('hidden');
@@ -4678,31 +4777,56 @@
     openMenu();
   }
 
+  // Al reanudar hay una cuenta atrás de 3 s con el juego congelado, para poder recolocarse.
+  const COUNTDOWN = 3;
+  let cdT = 0, cdShown = 0;
+  function showCountdown(n) {
+    const el = $('countdown');
+    if (!n) { el.classList.add('hidden'); cdShown = 0; return; }
+    if (n === cdShown) return;
+    cdShown = n;
+    el.textContent = n;
+    el.classList.remove('hidden', 'tick'); void el.offsetWidth; el.classList.add('tick');
+    Sound.play('click');
+  }
+  function enterPause() {
+    state = 'paused';
+    cdT = 0; showCountdown(0);
+    releaseJoys();
+    renderBuild(); syncToggles();
+    showOnly('pause');
+    Sound.suspend();
+  }
+  function startCountdown() {
+    state = 'countdown';
+    cdT = COUNTDOWN;
+    showOnly(null);
+    Sound.resume();
+    showCountdown(COUNTDOWN);
+  }
+  function tickCountdown(dt) {
+    cdT -= dt;
+    if (cdT > 0) { showCountdown(Math.ceil(cdT)); return; }
+    showCountdown(0);
+    state = 'play';
+    if (G && G.online === 'host') Net.send({ t: 'paused', on: false });
+  }
   function togglePause() {
     if (G && G.online === 'guest') {
-      if (state === 'play' || state === 'paused') Net.send({ t: 'pausereq' });
+      if (state === 'play' || state === 'paused' || state === 'countdown') Net.send({ t: 'pausereq' });
       return;
     }
-    if (state === 'play') {
-      state = 'paused';
-      releaseJoys();
-      renderBuild(); syncToggles();
-      showOnly('pause');
-      Sound.suspend();
+    if (state === 'play' || state === 'countdown') {
+      enterPause();
       if (G && G.online === 'host') Net.send({ t: 'paused', on: true });
     } else if (state === 'paused') {
-      state = 'play';
-      Sound.resume();
-      showOnly(null);
-      if (G && G.online === 'host') Net.send({ t: 'paused', on: false });
+      startCountdown();
+      if (G && G.online === 'host') Net.send({ t: 'resume' });
     }
   }
   function guestSetPaused(on) {
-    if (on && state === 'play') {
-      state = 'paused'; releaseJoys(); renderBuild(); syncToggles(); showOnly('pause'); Sound.suspend();
-    } else if (!on && state === 'paused') {
-      state = 'play'; Sound.resume(); showOnly(null);
-    }
+    if (on && (state === 'play' || state === 'countdown')) enterPause();
+    else if (!on && (state === 'paused' || state === 'countdown')) { showCountdown(0); if (state === 'paused') { showOnly(null); Sound.resume(); } state = 'play'; }
   }
 
   function renderBuild() {
@@ -4814,10 +4938,18 @@
   document.querySelectorAll('.back').forEach(b => b.addEventListener('click', () => { Sound.play('click'); openMenu(); }));
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      if (state === 'play') togglePause();
+      if (state === 'play' || state === 'countdown') togglePause();
       else if (state === 'levelup') Sound.suspend();
-    } else if (state === 'levelup') Sound.resume();
+    } else {
+      resetGfx();
+      if (state === 'levelup') Sound.resume();
+    }
   });
+  // En móvil, al volver de otra app el navegador puede haber descartado el lienzo: se reinician
+  // su escala y todas las imágenes guardadas (sprites de enemigos, luz de luna, cielo del portal…).
+  canvas.addEventListener('contextrestored', resetGfx);
+  addEventListener('pageshow', resetGfx);
+  addEventListener('focus', resetGfx);
   openMenu();
   if (pendingComp) showComp(pendingComp);
 
@@ -4827,6 +4959,7 @@
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     pollPads();
+    if (state === 'countdown') tickCountdown(dt);
     if (G && G.online === 'guest') {
       if (state !== 'paused' && state !== 'over' && state !== 'win') updateGuest(dt);
     } else if (state === 'play') update(dt);

@@ -240,6 +240,15 @@ button:disabled { opacity: .45; cursor: default; filter: grayscale(.4); }
 }
 @keyframes toastIn { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
+#countdown {
+  position: fixed; inset: 0; z-index: 6; display: flex; align-items: flex-start; justify-content: center; padding-top: 18vh;
+  pointer-events: none; background: rgba(10, 8, 26, .35);
+  font-family: var(--display); font-weight: 800; font-size: clamp(90px, 28vmin, 200px); color: #f4ecd8;
+  text-shadow: 0 0 24px rgba(200, 180, 255, .7), 0 6px 0 rgba(0, 0, 0, .45);
+}
+#countdown.tick { animation: cdTick 1s ease-out; }
+@keyframes cdTick { from { transform: scale(1.6); opacity: 0; } 25% { transform: scale(1); opacity: 1; } to { transform: scale(.85); opacity: .6; } }
+
 /* ---------- Cuenta ---------- */
 input, textarea {
   font: inherit; font-size: 16px; color: var(--text); width: 100%;
