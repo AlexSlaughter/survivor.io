@@ -1305,7 +1305,19 @@
     if (t.heavy) e.heavy = true;
     e.maxHp = e.hp;
     e.id = ++G.eid;
-    e.inA = !!G.arena && inArena(e.x, e.y);
+    // Con la jaula cerrada, la horda nunca aparece dentro: si le toca un sitio dentro de la valla,
+    // sale justo por fuera. Solo lo que invoque el jefe (m.inside) aparece dentro.
+    e.inA = false;
+    if (G.arena) {
+      if (m.inside) e.inA = true;
+      else {
+        const a = G.arena, dx = e.x - a.x, dy = e.y - a.y, d = Math.hypot(dx, dy), out = arenaR() + e.r + 30;
+        if (d < out) {
+          const an = d > 1 ? Math.atan2(dy, dx) : rand(0, TAU);
+          e.x = a.x + Math.cos(an) * out; e.y = a.y + Math.sin(an) * out;
+        }
+      }
+    }
     G.enemies.push(e);
     return e;
   }
@@ -1315,7 +1327,6 @@
   // vosotros, el jefe y lo que él invoque; la horda espera fuera. Se abre cuando no queda ningún jefe vivo.
   const ARENA_CLOSE = 0.9;
   function arenaR(a = G.arena) { const k = Math.min(1, a.t / ARENA_CLOSE); return a.R * (1 + (1 - k) * (1 - k) * 1.2); }
-  function inArena(x, y, pad = 0) { const a = G.arena; return a && dist2(x, y, a.x, a.y) < (arenaR() - pad) ** 2; }
   function openArena(color) {
     const al = alive().length ? alive() : G.players.filter(p => !p.gone);
     const cx = al.reduce((s, p) => s + p.x, 0) / al.length, cy = al.reduce((s, p) => s + p.y, 0) / al.length;
@@ -1545,7 +1556,7 @@
   function summonAround(e, type, n) {
     for (let i = 0; i < n && G.enemies.length < G.maxEnemies; i++) {
       const a = rand(0, TAU);
-      const m = spawnEnemy(type, { pos: [e.x + Math.cos(a) * (e.r + 14), e.y + Math.sin(a) * (e.r + 14)] });
+      const m = spawnEnemy(type, { pos: [e.x + Math.cos(a) * (e.r + 14), e.y + Math.sin(a) * (e.r + 14)], inside: !!e.inA });
       m.xp = 0.5;
     }
     burst(e.x, e.y, '#5fe0c0', 10, 140);
