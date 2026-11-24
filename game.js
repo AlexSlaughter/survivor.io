@@ -4604,7 +4604,9 @@
       if (Net.role === 'host') { Net.sendTo(slot, myHello()); sendRoster(); }
       else { Net.send(myHello()); lobbyStatus('Conectado. Esperando al anfitrión…'); }
     } else if (st === 'failed') {
-      lobbyStatus('No se ha podido conectar. Puede que vuestras redes bloqueen la conexión directa: probad con otra red (por ejemplo, datos móviles).', true);
+      lobbyStatus(Array.isArray(window.TURN_SERVERS) && window.TURN_SERVERS.length
+        ? 'No se ha podido conectar. Revisad vuestra conexión a Internet y volved a intentarlo.'
+        : 'No se ha podido conectar: vuestras redes no permiten la conexión directa (pasa casi siempre con datos móviles). Probad los dos con wifi, o configurad un servidor TURN (ver README).', true);
     } else if (st === 'error') {
       lobbyStatus('Error con la sala: ' + Cloud.message(info) + ' (revisa las reglas de Firestore, ver README).', true);
     } else if (st === 'closed') onDisconnect(slot);
