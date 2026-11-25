@@ -216,4 +216,5 @@ Para publicarlo gratis, activa **GitHub Pages** en *Settings → Pages* con esta
 - `net.js`: conexión directa entre jugadores (WebRTC) para el cooperativo online.
 - `firebase-config.js`: configuración de tu proyecto de Firebase.
 - `firestore.rules`: reglas de seguridad de la base de datos.
+- `sprites/`: dibujos de personajes y enemigos generados con FLUX.1 [schnell] en Hugging Face (fondo quitado y recortados). Si alguno no carga, el juego usa el dibujo hecho con código.
 - `game.js`: motor del juego (entrada, aparición de enemigos, armas, colisiones con rejilla espacial, renderizado, menús y guardado).

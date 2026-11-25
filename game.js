@@ -2261,6 +2261,34 @@
   const isWarn = e => e.mode === 1 || (e.bomb && e.fuse >= 0);
   // Caché de sprites: cada enemigo común se dibuja una vez por fotograma de animación y luego
   // se copia como imagen. Con cientos de monstruos en pantalla, redibujar los contornos cuesta mucho.
+  // ---------- Sprites generados (Hugging Face / FLUX) ----------
+  // Si una imagen no carga, se usa el dibujo a mano de siempre.
+  // dir: hacia dónde mira la imagen original (1 derecha, -1 izquierda).
+  const HERO_IMG_DIR = { marc: 1, salim: 1, alex: 1, pol: 1, igor: -1, ivan: 1 };
+  // Enemigos: tamaño en radios (alto «h» o ancho «w»), color base de la imagen (para teñirla en cada mapa) y dirección.
+  const ENEMY_IMG = {
+    slime: { h: 2.6, base: '#5fd068', dir: -1 },
+    murcielago: { w: 4.4, base: '#a77bf3', dir: 1 },
+  };
+  const IMGS = {};
+  function loadImg(id) {
+    const im = new Image();
+    im.onload = () => {
+      IMGS[id] = im; sprites.clear();
+      if (!G && !$('select').classList.contains('hidden')) renderSelect();
+    };
+    im.src = `sprites/${id}.png?v=1`;
+  }
+  for (const id in HERO_IMG_DIR) loadImg(id);
+  for (const id in ENEMY_IMG) loadImg(id);
+  function hueOf(hex) {
+    const n = parseInt(hex.slice(1, 7), 16), r = (n >> 16 & 255) / 255, gg = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+    const mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), d = mx - mn;
+    if (!d) return 0;
+    const h = mx === r ? ((gg - b) / d) % 6 : mx === gg ? (b - r) / d + 2 : (r - gg) / d + 4;
+    return h * 60;
+  }
+
   const SPRITE_TYPES = new Set(['slime', 'murcielago', 'espectro', 'bruto', 'brujo', 'arana', 'lobo', 'calabaza', 'golem', 'invocador']);
   const SPR_N = 32, SPR_P = 4 * Math.PI;   // todas las animaciones se repiten cada 4π de "wob"
   // Hasta dónde llega cada sprite (en radios): mitad del ancho, arriba y abajo.
@@ -2275,10 +2303,27 @@
     // Misma escala que la pantalla, para copiar el sprite píxel a píxel sin reescalarlo.
     const k = Math.min(window.devicePixelRatio || 1, 2) * ZOOM;
     if (k !== sprK) { sprites.clear(); sprK = k; }
-    const key = e.type + e.color + (r * 4 | 0) + '|' + f + (flash ? 'f' : '');
+    const im = IMGS[e.type], fit = ENEMY_IMG[e.type];
+    const key = e.type + e.color + (r * 4 | 0) + '|' + (im ? 0 : f) + (flash ? 'f' : '');
     let s = sprites.get(key);
     if (s) return s;
     if (sprites.size > 1200) sprites.clear();
+    if (im) {
+      // Imagen: se escala una vez a la resolución de la pantalla, mirando a la derecha y teñida con el color del mapa.
+      const dh = fit.h ? fit.h * r : fit.w * r * im.height / im.width, dw = dh * im.width / im.height;
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(dw * k)); c.height = Math.max(1, Math.round(dh * k));
+      const pc = c.getContext('2d');
+      if (fit.dir < 0) { pc.translate(c.width, 0); pc.scale(-1, 1); }
+      const hr = ((hueOf(e.color) - hueOf(fit.base)) % 360 + 360) % 360;
+      if (hr > 4 && hr < 356) pc.filter = `hue-rotate(${hr | 0}deg)`;
+      pc.drawImage(im, 0, 0, c.width, c.height);
+      pc.filter = 'none';
+      if (flash) { pc.setTransform(1, 0, 0, 1, 0, 0); pc.globalCompositeOperation = 'source-atop'; pc.fillStyle = 'rgba(255,255,255,.85)'; pc.fillRect(0, 0, c.width, c.height); }
+      s = { c, x: -dw / 2, y: r * 0.95 - dh, w: dw, h: dh };
+      sprites.set(key, s);
+      return s;
+    }
     const [ex, et, eb] = SPR_EXT[e.type], pad = 4;
     const w = Math.ceil((ex * r + pad) * k) / k, top = Math.ceil((et * r + pad) * k) / k, bot = Math.ceil((eb * r + pad) * k) / k;
     const c = document.createElement('canvas');
@@ -2346,7 +2391,13 @@
       const s = enemySprite(e, r, f, e.flash > 0);
       // Animación: aparece con un saltito, se balancea al andar y se aplasta al recibir un golpe.
       const pop = Math.min(1, (t - (e.born ?? -9)) / 0.28), sp = pop < 1 ? 1 + Math.sin(pop * Math.PI) * 0.25 - (1 - pop) * 0.9 : 1;
-      const hitK = e.flash > 0 ? 1 : 0, sx = sp * (1 + hitK * 0.16), sy = sp * (1 - hitK * 0.14) * (1 + Math.sin(e.wob * 2) * 0.035);
+      const hitK = e.flash > 0 ? 1 : 0;
+      let sx = sp * (1 + hitK * 0.16), sy = sp * (1 - hitK * 0.14) * (1 + Math.sin(e.wob * 2) * 0.035);
+      if (IMGS[e.type]) {
+        // Con imagen: el slime se estira y se aplasta; el murciélago aletea.
+        if (e.type === 'slime') { const q = Math.sin(e.wob * 2) * 0.09; sx *= 1 + q; sy *= 1 - q; }
+        else if (e.type === 'murcielago') { sy *= 1 + Math.sin(e.wob * 5) * 0.13; ctx.translate(0, Math.sin(e.wob * 2.5) * r * 0.25); }
+      }
       const pv = r * 0.9;
       ctx.translate(0, pv); ctx.rotate(Math.sin(e.wob) * 0.07); ctx.scale(sx * (sd < 0 ? -1 : 1), sy); ctx.translate(0, -pv);
       ctx.imageSmoothingEnabled = false;   // el sprite ya está a la escala de la pantalla
@@ -2870,6 +2921,44 @@
   /* Dibuja a un personaje; se usa en el juego y en los retratos del menú.
      face: { x, y, side, walk, wpn (id del arma principal), aim (ángulo) }. */
   function drawHero(x, y, r, ch, face, bob, glow = true) {
+    if (IMGS[ch.id]) { drawHeroImg(x, y, r, ch, face, glow); return; }
+    drawHeroVector(x, y, r, ch, face, bob, glow);
+  }
+  // Personaje con imagen: salta al andar, se inclina hacia donde va, respira quieto y lleva el arma en la mano.
+  function drawHeroImg(x, y, r, ch, face, glow) {
+    const im = IMGS[ch.id], tt = G ? G.time : menuT;
+    const sd = face.side || (face.x >= 0 ? 1 : -1), walk = face.walk || 0, mv = face.mv ? 1 : 0;
+    const H_ = r * 4.1 * (ch.tall ? 1.15 : 1), W_ = H_ * im.width / im.height;
+    const feet = y + r * 0.95;
+    if (glow) {
+      const lg = ctx.createRadialGradient(x, y, r * 0.3, x, y, r * 2.6);
+      lg.addColorStop(0, 'rgba(255,236,190,.16)'); lg.addColorStop(1, 'rgba(255,236,190,0)');
+      ctx.fillStyle = lg; ctx.beginPath(); ctx.arc(x, y, r * 2.6, 0, TAU); ctx.fill();
+    }
+    const hop = mv * Math.abs(Math.sin(walk)) * r * 0.22;
+    const land = mv * (1 - Math.abs(Math.sin(walk))) * 0.06;
+    const breath = (1 - mv) * Math.sin(tt * 2.4 + ch.id.length) * 0.025;
+    const sy = 1 + breath - land, sx = 1 - breath * 0.6 + land * 0.8;
+    const tilt = mv * (sd * 0.07 + Math.sin(walk) * 0.06);
+    const wpn = face.wpn, aim = face.aim ?? Math.atan2(face.y || 0, face.x || 1);
+    const drawWpn = () => {
+      const hx = x + Math.cos(aim) * r * 0.85, hy = feet - hop - H_ * 0.36 + Math.sin(aim) * r * 0.35;
+      ctx.save(); ctx.translate(hx, hy); ctx.rotate(aim);
+      if (Math.cos(aim) < 0) ctx.scale(1, -1);
+      drawHeldWeapon(wpn, r * 0.12, tt);
+      ctx.restore();
+    };
+    if (wpn && Math.sin(aim) < -0.3) drawWpn();
+    ctx.save();
+    ctx.translate(x, feet - hop);
+    ctx.rotate(tilt);
+    ctx.scale(sx * sd * (HERO_IMG_DIR[ch.id] || 1), sy);
+    ctx.drawImage(im, -W_ / 2, -H_, W_, H_);
+    ctx.restore();
+    if (wpn && Math.sin(aim) >= -0.3) drawWpn();
+  }
+
+  function drawHeroVector(x, y, r, ch, face, bob, glow = true) {
     const sd = face.side || (face.x >= 0 ? 1 : -1);
     const wide = ch.wide || 1, tall = ch.tall || 1, lw = Math.max(1.4, r * 0.13);
     const walk = face.walk || 0, stepA = Math.sin(walk) * r * 0.22;
@@ -3038,7 +3127,9 @@
       if (p.gone) continue;
       const bob = Math.sin(p.walk) * 1.5;
       const aim = p.aimA !== undefined && G.time - (p.aimT || 0) < 1.2 ? p.aimA : Math.atan2(p.face.y, p.face.x);
-      const face = { x: p.face.x, y: p.face.y, side: p.side, walk: p.walk, wpn: mainWeaponOf(p), aim };
+      const now = performance.now();
+      if (p.walk !== p._lw) { p._lw = p.walk; p._mvT = now; }
+      const face = { x: p.face.x, y: p.face.y, side: p.side, walk: p.walk, wpn: mainWeaponOf(p), aim, mv: now - (p._mvT || 0) < 120 };
       if (p.down) {
         // Jugador caído: fantasma con el anillo de reanimación.
         ctx.globalAlpha = 0.4;
@@ -4358,7 +4449,7 @@
             if (j0 >= u.pts.length - 1) continue;
             const qx = u.pts[j0][0] + (u.pts[j0 + 1][0] - u.pts[j0][0]) * jf, qy = u.pts[j0][1] + (u.pts[j0 + 1][1] - u.pts[j0][1]) * jf;
             ctx.globalAlpha = k ? 0.18 * (4 - k) : 0.9;
-            drawHero(qx, qy, p.r, p.ch, { x: dirx >= 0 ? 1 : -1, y: 0, side: dirx >= 0 ? 1 : -1, walk: t * 30 }, 0, false);
+            drawHero(qx, qy, p.r, p.ch, { x: dirx >= 0 ? 1 : -1, y: 0, side: dirx >= 0 ? 1 : -1, walk: t * 30, mv: true }, 0, false);
           }
           ctx.globalAlpha = 1;
         }
