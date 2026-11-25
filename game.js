@@ -250,7 +250,7 @@
     const p = {
       idx, x, y: 0, r: 14 * (ch.mods.size || 1), hp: 100, maxHp: 100, inv: 0, face: { x: 1, y: 0 }, side: 1, walk: 0, ch,
       color: PCOLORS[idx], down: false, reviveT: 0, revives: ul('renacer'), choices: 3 + ul('vision'),
-      stats: { dmg: 1, cd: 1, speed: 1, regen: 0, magnet: 1, area: 1, proj: 0, armor: 0, xp: 1, gold: 1 },
+      stats: { dmg: 1, cd: 1, speed: 1, regen: 0, magnet: 1, area: 1, proj: 0, armor: 0, xp: 1, gold: 1, dodge: 0, thorns: 0, leech: 0, luck: 0, mana: 0 },
       weapons: [], passives: {},
       // Cada jugador tiene su propia experiencia y su propio nivel.
       level: 1, xp: 0, xpNext: 5, pending: 0, opts: null, optsSent: false,
@@ -295,7 +295,7 @@
     for (let i = 0; i < n; i++) players.push(makePlayer(charById(chars[i]), i, coop ? (i - (n - 1) / 2) * 60 : 0, ups[i], gears[i]));
     G = {
       time: 0, spawnAcc: 0, nextElite: 60, nextSwarm: 45, bossIdx: 0, shake: 0, pending: 0,
-      boss: null, arena: null, opts: [], map, gold: 0, coins: 0, bossKills: 0,
+      boss: null, opts: [], map, gold: 0, coins: 0, bossKills: 0,
       coop, players, p: players[0], cx: 0, cy: 0,
       kills: 0, chooserP: null, lvShown: null,
       // Con más jugadores aparecen algo más de enemigos (cada uno sube de nivel con lo que recoge),
@@ -487,6 +487,19 @@
       G.particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.3, 0.6), max: 0.6, color, size: rand(2, 4) });
     }
   }
+  // Aviso grande (aparte del toast, para que no lo tape otro mensaje) cuando cae un compañero.
+  let alertTimer = 0;
+  function deathAlert(msg, sub, localOnly) {
+    if (!localOnly) netOut(['d', msg, sub]);
+    const t = $('deathAlert');
+    t.innerHTML = '';
+    const b = document.createElement('b'); b.textContent = msg; t.appendChild(b);
+    if (sub) { const s = document.createElement('small'); s.textContent = sub; t.appendChild(s); }
+    t.classList.remove('hidden');
+    t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '';
+    clearTimeout(alertTimer);
+    alertTimer = setTimeout(() => t.classList.add('hidden'), 3800);
+  }
   let toastTimer = 0;
   function toast(msg, localOnly) {
     if (!localOnly) netOut(['m', msg]);
@@ -518,10 +531,17 @@
     dropGem(e.x, e.y, e.xp);
     if (e.elite || e.boss) G.pickups.push({ type: 'cofre', x: e.x, y: e.y, t: 0 });
     else {
+      // Trébol de la Suerte: el mejor del grupo multiplica las probabilidades de botín.
+      const lk = 1 + Math.max(0, ...G.players.map(p => p.stats.luck || 0));
       const r = Math.random();
-      if (r < 0.010) G.pickups.push({ type: 'carne', x: e.x, y: e.y, t: 0 });
-      else if (r < 0.014) G.pickups.push({ type: 'iman', x: e.x, y: e.y, t: 0 });
-      else if (r < 0.05) dropCoin(e.x, e.y);
+      if (r < 0.010 * lk) G.pickups.push({ type: 'carne', x: e.x, y: e.y, t: 0 });
+      else if (r < 0.014 * lk) G.pickups.push({ type: 'iman', x: e.x, y: e.y, t: 0 });
+      else if (r < 0.05 * lk) dropCoin(e.x, e.y);
+    }
+    // Colmillo Vampírico: cura a quien esté cerca.
+    for (const p of G.players) {
+      if (p.down || !p.stats.leech || dist2(p.x, p.y, e.x, e.y) > 450 * 450) continue;
+      if (Math.random() < p.stats.leech) p.hp = Math.min(p.maxHp, p.hp + 2);
     }
     if (e.boss) {
       // Si quedaba otro jefe vivo, su barra sigue en pantalla.
@@ -529,9 +549,7 @@
       G.shake = 14; G.bossKills++;
       if (e.final) endGame(true);
       else {
-        const was = !!G.arena;
-        closeArenaIfDone();
-        toast(`¡Has derrotado a ${e.name}!${was && !G.arena ? ' 🔓 La jaula se abre' : ''}`);
+        toast(`¡Has derrotado a ${e.name}!`);
       }
     }
   }
@@ -566,6 +584,26 @@
 
   function damagePlayer(p, d) {
     if (p.down || p.inv > 0 || state !== 'play') return;
+    const st = p.stats;
+    // Capa Sombría: a veces esquivas el golpe.
+    if (st.dodge && Math.random() < st.dodge) { p.inv = 0.3; addText(p.x, p.y - 26, '¡Esquivado!', '#b8c7ff'); return; }
+    // Cristal de Maná: el escudo, si está cargado, bloquea el golpe entero.
+    if (st.mana && (p.manaT || 0) <= 0) {
+      p.manaT = 15 - 2 * st.mana; p.inv = 0.5;
+      addText(p.x, p.y - 26, '¡Bloqueado!', '#9fd0ff');
+      burst(p.x, p.y, '#9fd0ff', 14, 160);
+      sfx('zap', 0.1);
+      return;
+    }
+    // Cota de Espinas: devuelve daño a lo que te rodea.
+    if (st.thorns) {
+      query(p.x, p.y, 110, e => {
+        const kx = e.x - p.x, ky = e.y - p.y, l = Math.hypot(kx, ky) || 1;
+        hurt(e, st.thorns * st.dmg, kx / l, ky / l, 260);
+      });
+      G.effects.push({ type: 'ring', x: p.x, y: p.y, R: 110, color: '#7bc96f', life: 0.4, max: 0.4 });
+      netOut(['r', Math.round(p.x), Math.round(p.y), 110, '#7bc96f']);
+    }
     const dmg = Math.max(1, d - p.stats.armor);
     p.hp -= dmg; p.inv = 0.5;
     G.shake = Math.max(G.shake, 6);
@@ -586,7 +624,8 @@
       // En cooperativo, el jugador cae y su compañero puede reanimarlo.
       p.hp = 0; p.down = true; p.reviveT = 0;
       burst(p.x, p.y, p.color, 30, 200);
-      toast(`💀 ${pname(p)} ha caído. ¡Quédate a su lado para reanimarlo!`);
+      sfx('warn');
+      deathAlert(`💀 ¡${(G.names && G.names[p.idx]) || pname(p)} ha muerto!`, 'Quédate a su lado para reanimarlo');
     } else {
       p.hp = 0; p.down = true;
       endGame(false);
@@ -1071,6 +1110,127 @@
     },
   });
 
+  // Armas nuevas: cadena, torbellino, minas, espíritus y pisotón.
+  Object.assign(W_UPDATE, {
+    cadena(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      const lv = w.lvl, ev = w.evolved;
+      const first = nearest(p.x, p.y, 1, 420)[0];
+      if (!first) { w.t = 0.2; return; }
+      w.t = (1.8 - 0.1 * lv - (lv >= 5 ? 0.15 : 0)) * s.cd * (ev ? 0.75 : 1);
+      const jumps = (ev ? 8 : [3, 4, 4, 5, 5][lv - 1]) + s.proj;
+      const dmg = (11 + 5 * lv + (lv >= 3 ? 4 : 0)) * (ev ? 1.5 : 1) * s.dmg, hop = (150 + (lv >= 3 ? 40 : 0)) * Math.sqrt(s.area);
+      const hit = new Set(), pts = [Math.round(p.x), Math.round(p.y)];
+      let cur = first;
+      for (let i = 0; i < jumps && cur; i++) {
+        hit.add(cur); pts.push(Math.round(cur.x), Math.round(cur.y));
+        const cx = cur.x, cy = cur.y;
+        hurt(cur, dmg);
+        // Evolucionada, aturde un instante (los jefes no).
+        if (ev && !cur.boss) cur.frz = Math.max(cur.frz, 0.4);
+        let nx = null, nd = hop * hop;
+        query(cx, cy, hop, e => { if (hit.has(e)) return; const d = dist2(e.x, e.y, cx, cy); if (d < nd) { nd = d; nx = e; } });
+        cur = nx;
+      }
+      G.effects.push({ type: 'chain', pts, ev, life: 0.25, max: 0.25 });
+      netOut(['c', pts, ev ? 1 : 0]);
+      sfx('zap', 0.1);
+    },
+    torbellino(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      const lv = w.lvl, ev = w.evolved;
+      const tg = nearest(p.x, p.y, 1, 450)[0];
+      if (!tg) { w.t = 0.2; return; }
+      w.t = (2.8 - 0.12 * lv - (lv >= 5 ? 0.25 : 0)) * s.cd * (ev ? 0.8 : 1);
+      const n = (ev ? 3 : [1, 1, 2, 2, 2][lv - 1]) + s.proj, a0 = aimAt(p, tg);
+      const r = (18 + (lv >= 4 ? 6 : 0)) * Math.sqrt(s.area) * (ev ? 1.35 : 1);
+      const dmg = (6 + 3 * lv) * (ev ? 1.5 : 1) * s.dmg;
+      for (let i = 0; i < n; i++) {
+        const a = a0 + spreadA(i, n, 0.5);
+        G.bullets.push({
+          kind: 'bala', x: p.x, y: p.y, vx: Math.cos(a) * 150, vy: Math.sin(a) * 150, r, dmg,
+          life: 3.2 + (lv >= 4 ? 1 : 0) + (ev ? 1 : 0), pierce: 1e9, hit: new Set(), hits: new Map(), rehit: 0.4,
+          color: ev ? '#c9a3ff' : '#dff1ff', kb: 40, shape: 'tornado', ev, slow: ev ? 0.8 : 0,
+        });
+      }
+      sfx('disc', 0.15);
+    },
+    minas(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      const lv = w.lvl, ev = w.evolved;
+      w.t = (2.4 - 0.1 * lv - (lv >= 5 ? 0.25 : 0)) * s.cd * (ev ? 0.7 : 1);
+      const n = (ev ? 3 : [1, 1, 1, 2, 2][lv - 1]) + s.proj;
+      const R = (60 + 5 * lv + (lv >= 3 ? 15 : 0)) * s.area * (ev ? 1.3 : 1);
+      const dmg = (24 + 9 * lv) * (ev ? 1.4 : 1) * s.dmg;
+      for (let i = 0; i < n; i++) {
+        const a = rand(0, TAU), d = rand(25, 90);
+        G.bullets.push({
+          kind: 'bala', x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d, vx: 0, vy: 0, r: 11, R, dmg,
+          life: 10, pierce: 0, hit: new Set(), color: '#ff4d4d', kb: 0, shape: 'mine', ev, mine: true, arm: 0.5,
+        });
+      }
+      sfx('disc', 0.2);
+    },
+    espiritus(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      const lv = w.lvl, ev = w.evolved;
+      if (!nearest(p.x, p.y, 1, 500).length) { w.t = 0.2; return; }
+      w.t = (1.7 - 0.08 * lv) * s.cd * (ev ? 0.7 : 1);
+      const n = (ev ? 4 : [1, 2, 2, 3, 3][lv - 1]) + s.proj;
+      const dmg = (10 + 4 * lv + (lv >= 3 ? 5 : 0)) * (ev ? 1.6 : 1) * s.dmg;
+      for (let i = 0; i < n; i++) {
+        const a = i / n * TAU + rand(-0.3, 0.3);
+        G.bullets.push({
+          kind: 'bala', x: p.x, y: p.y, vx: Math.cos(a) * 280, vy: Math.sin(a) * 280, spd: 300, home: true, seek: 0,
+          r: 7 * Math.sqrt(s.area), dmg, life: 3, pierce: ev ? 2 : lv >= 5 ? 1 : 0, hit: new Set(),
+          color: ev ? '#ff7ab8' : '#9ff0ff', kb: 60, shape: 'wisp', ev, owner: p, leech: ev ? 1 : 0,
+        });
+      }
+      sfx('shoot', 0.12);
+    },
+    terremoto(w, dt, p, s) {
+      w.t -= dt;
+      if (w.t > 0) return;
+      const lv = w.lvl, ev = w.evolved;
+      const R = (110 + 12 * lv + (lv >= 3 ? 15 : 0)) * s.area * (ev ? 1.3 : 1);
+      if (!nearest(p.x, p.y, 1, R + 20).length) { w.t = 0.2; return; }
+      w.t = (3.2 - 0.15 * lv - (lv >= 2 ? 0.15 : 0) - (lv >= 4 ? 0.15 : 0)) * s.cd * (ev ? 0.75 : 1);
+      const dmg = (16 + 7 * lv) * (ev ? 1.5 : 1) * s.dmg;
+      query(p.x, p.y, R, e => {
+        const kx = e.x - p.x, ky = e.y - p.y, l = Math.hypot(kx, ky) || 1;
+        hurt(e, dmg, kx / l, ky / l, 260);
+        e.slow = Math.max(e.slow, 1.2);
+        // Evolucionado, aturde (los jefes solo se ralentizan).
+        if (ev && !e.boss) e.frz = Math.max(e.frz, 0.8);
+      });
+      const col = ev ? '#ffb347' : '#c58a4a';
+      G.effects.push({ type: 'ring', x: p.x, y: p.y, R, color: col, life: 0.4, max: 0.4 });
+      netOut(['r', Math.round(p.x), Math.round(p.y), Math.round(R), col]);
+      burst(p.x, p.y, '#8b6a45', 12, 200);
+      G.shake = Math.max(G.shake, 5);
+      sfx('boom', 0.1);
+    },
+  });
+
+  // Los espíritus giran poco a poco hacia el enemigo más cercano que aún no hayan golpeado.
+  function steer(b, dt) {
+    if (!b.tg || b.tg.dead || b.hit.has(b.tg)) {
+      b.tg = null;
+      b.seek -= dt;
+      if (b.seek > 0) return;
+      b.seek = 0.2;
+      b.tg = nearest(b.x, b.y, 5, 420).find(e => !b.hit.has(e)) || null;
+      if (!b.tg) return;
+    }
+    const cur = Math.atan2(b.vy, b.vx), d0 = Math.atan2(b.tg.y - b.y, b.tg.x - b.x) - cur;
+    const d = Math.atan2(Math.sin(d0), Math.cos(d0)), a = cur + Math.max(-7 * dt, Math.min(7 * dt, d));
+    b.vx = Math.cos(a) * b.spd; b.vy = Math.sin(a) * b.spd;
+  }
+
   Object.assign(W_UPDATE, MAIN_UPDATE);
 
   // ---------- Subida de nivel ----------
@@ -1305,61 +1465,17 @@
     if (t.heavy) e.heavy = true;
     e.maxHp = e.hp;
     e.id = ++G.eid;
-    // Con la jaula cerrada, la horda nunca aparece dentro: si le toca un sitio dentro de la valla,
-    // sale justo por fuera. Solo lo que invoque el jefe (m.inside) aparece dentro.
-    e.inA = false;
-    if (G.arena) {
-      if (m.inside) e.inA = true;
-      else {
-        const a = G.arena, dx = e.x - a.x, dy = e.y - a.y, d = Math.hypot(dx, dy), out = arenaR() + e.r + 30;
-        if (d < out) {
-          const an = d > 1 ? Math.atan2(dy, dx) : rand(0, TAU);
-          e.x = a.x + Math.cos(an) * out; e.y = a.y + Math.sin(an) * out;
-        }
-      }
-    }
     G.enemies.push(e);
     return e;
   }
 
-  // ---------- Jaula del jefe ----------
-  // Al aparecer un jefe se cierra un círculo de estacas alrededor de los jugadores: dentro solo quedáis
-  // vosotros, el jefe y lo que él invoque; la horda espera fuera. Se abre cuando no queda ningún jefe vivo.
-  const ARENA_CLOSE = 0.9;
-  function arenaR(a = G.arena) { const k = Math.min(1, a.t / ARENA_CLOSE); return a.R * (1 + (1 - k) * (1 - k) * 1.2); }
-  function openArena(color) {
-    const al = alive().length ? alive() : G.players.filter(p => !p.gone);
-    const cx = al.reduce((s, p) => s + p.x, 0) / al.length, cy = al.reduce((s, p) => s + p.y, 0) / al.length;
-    const spread = Math.max(0, ...al.map(p => Math.hypot(p.x - cx, p.y - cy)));
-    const R = Math.min(620, Math.max(Math.min(VW, VH) * 0.46, 230, spread + 90));
-    G.arena = { x: cx, y: cy, R, t: 0, color };
-    // Lo que ya estaba dentro sale despedido hacia fuera (los élites también).
-    for (const e of G.enemies) if (!e.boss) e.inA = false;
-    for (const b of G.ebullets) b.inA = false;
-  }
-  function closeArenaIfDone() {
-    if (!G.arena || G.enemies.some(o => o.boss && !o.dead)) return;
-    const a = G.arena, R = arenaR();
-    for (let i = 0; i < 24; i++) { const an = i / 24 * TAU; burst(a.x + Math.cos(an) * R, a.y + Math.sin(an) * R, a.color, 4, 120); }
-    G.arena = null;
-    for (const e of G.enemies) e.inA = false;
-  }
-  // Mantiene a cada uno en su lado de la valla.
-  function arenaKeep(o, inside) {
-    const a = G.arena, R = arenaR(), dx = o.x - a.x, dy = o.y - a.y, d = Math.hypot(dx, dy) || 0.01;
-    if (inside) { const m = R - o.r - 4; if (d > m) { o.x = a.x + dx / d * m; o.y = a.y + dy / d * m; return true; } }
-    else { const m = R + o.r + 4; if (d < m) { const nd = Math.min(m, d + 700 * (1 / 60)); o.x = a.x + dx / d * nd; o.y = a.y + dy / d * nd; } }
-    return false;
-  }
-
   const BOSS_REF_LVL = [16, 33, 54, 71];
   function spawnBoss(b) {
-    if (!G.arena) openArena(b.color);
-    const a = G.arena;
-    // Aparece dentro de la jaula, en el lado contrario al de los jugadores.
-    const al = alive(), ref = al.length ? al[0] : G.players[0];
-    const an = Math.atan2(a.y - ref.y, a.x - ref.x) + (Math.hypot(a.x - ref.x, a.y - ref.y) < 20 ? rand(0, TAU) : 0);
-    const x = a.x + Math.cos(an) * a.R * 0.68, y = a.y + Math.sin(an) * a.R * 0.68;
+    // Aparece a cierta distancia del grupo, por un lado al azar.
+    const al = alive(), grp = al.length ? al : G.players.filter(p => !p.gone);
+    const cx = grp.reduce((s, p) => s + p.x, 0) / grp.length, cy = grp.reduce((s, p) => s + p.y, 0) / grp.length;
+    const an = rand(0, TAU), dd = Math.max(260, Math.min(VW, VH) * 0.42);
+    const x = cx + Math.cos(an) * dd, y = cy + Math.sin(an) * dd;
     // La vida del jefe se adapta a lo fuertes que llegáis: el nivel medio comparado con el nivel
     // habitual a esa altura de la partida (x0,9 si vais flojos, x1,5 normal, hasta x2,25 si vais sobrados).
     const lv = al.length ? al.reduce((s, p) => s + p.level, 0) / al.length : 1;
@@ -1368,14 +1484,14 @@
     const e = {
       x, y, type: 'boss', r: b.r, hp, maxHp: hp, speed: b.speed * G.map.speed, dmg: b.dmg, xp: 60, color: b.color,
       flash: 0, kx: 0, ky: 0, slow: 0, frz: 0, boss: true, final: b.final, name: b.name, shots: b.shots,
-      ai: b.ai || 'ring', variant: BOSSES.indexOf(b), shotT: 3, sumT: 2, chT: 4, mode: 0, wob: 0, phase: 0, inA: true,
+      ai: b.ai || 'ring', variant: BOSSES.indexOf(b), shotT: 3, sumT: 2, chT: 4, mode: 0, wob: 0, phase: 0,
     };
     e.id = ++G.eid;
     G.enemies.push(e);
     G.boss = e;
     G.shake = 10;
     sfx('boss');
-    toast(`⚠ ${b.name} · 🔒 ¡Jaula cerrada! Derrótalo para salir`);
+    toast(`⚠ ¡${b.name} ha aparecido!`);
   }
 
   function spawner(dt) {
@@ -1443,7 +1559,7 @@
         // El invitado mueve a su personaje en su propia pantalla y nos envía la posición.
         const r = G.remote[p.idx];
         if (r) { p.x = r.x; p.y = r.y; p.face = { x: r.fx, y: r.fy }; p.side = r.side; p.walk = r.walk; }
-        p.inv -= dt; p.slowT = (p.slowT || 0) - dt;
+        p.inv -= dt; p.slowT = (p.slowT || 0) - dt; p.manaT = (p.manaT || 0) - dt;
         if (p.stats.regen) p.hp = Math.min(p.maxHp, p.hp + p.stats.regen * dt);
         continue;
       }
@@ -1457,12 +1573,8 @@
         if (Math.abs(dx) > 0.1) p.side = Math.sign(dx);
         p.walk += dt * 10;
       }
-      p.inv -= dt; p.slowT = (p.slowT || 0) - dt;
+      p.inv -= dt; p.slowT = (p.slowT || 0) - dt; p.manaT = (p.manaT || 0) - dt;
       if (p.stats.regen) p.hp = Math.min(p.maxHp, p.hp + p.stats.regen * dt);
-    }
-    if (G.arena) {
-      G.arena.t += dt;
-      for (const p of G.players) if (!p.gone) arenaKeep(p, true);
     }
     // Punto de referencia (para la mirada de los enemigos): el jugador de esta pantalla.
     G.cx = G.p.x; G.cy = G.p.y;
@@ -1543,14 +1655,12 @@
         if (!p.down && dist2(e.x, e.y, p.x, p.y) < (e.r + p.r) ** 2) damagePlayer(p, e.dmg);
       }
       if (e.boss) bossAI(e, dt, tg, dx / d, dy / d, d);
-      if (G.arena) arenaKeep(e, e.inA);
     }
   }
 
   function bombBlast(e) {
     const R = e.bomb.R;
-    const fenced = G.arena && !e.inA;
-    for (const p of G.players) if (!p.down && !fenced && dist2(e.x, e.y, p.x, p.y) < (R + p.r) ** 2) damagePlayer(p, e.sdmg);
+    for (const p of G.players) if (!p.down && dist2(e.x, e.y, p.x, p.y) < (R + p.r) ** 2) damagePlayer(p, e.sdmg);
     G.effects.push({ type: 'boom', x: e.x, y: e.y, R, life: 0.35, max: 0.35 });
     netOut(['x', Math.round(e.x), Math.round(e.y), R]);
     G.shake = Math.max(G.shake, 5);
@@ -1563,7 +1673,7 @@
   function summonAround(e, type, n) {
     for (let i = 0; i < n && G.enemies.length < G.maxEnemies; i++) {
       const a = rand(0, TAU);
-      const m = spawnEnemy(type, { pos: [e.x + Math.cos(a) * (e.r + 14), e.y + Math.sin(a) * (e.r + 14)], inside: !!e.inA });
+      const m = spawnEnemy(type, { pos: [e.x + Math.cos(a) * (e.r + 14), e.y + Math.sin(a) * (e.r + 14)] });
       m.xp = 0.5;
     }
     burst(e.x, e.y, '#5fe0c0', 10, 140);
@@ -1576,7 +1686,7 @@
     if (G.ebullets.length > 45) { e.shotT = Math.max(e.shotT, 1); return; }
     for (let i = 0; i < n; i++) {
       const ang = a + spreadA(i, n, r.spread);
-      G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(ang) * r.spd, vy: Math.sin(ang) * r.spd, r: 5, dmg: e.sdmg * (e.elite ? 1.5 : 1), life: 3, color: r.color, inA: !!e.inA });
+      G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(ang) * r.spd, vy: Math.sin(ang) * r.spd, r: 5, dmg: e.sdmg * (e.elite ? 1.5 : 1), life: 3, color: r.color });
     }
     e.flash = 0.06;
     sfx('pew', 0.12);
@@ -1586,17 +1696,17 @@
     e.phase += 0.3;
     for (let i = 0; i < n && G.ebullets.length < 300; i++) {
       const a = i / n * TAU + e.phase;
-      G.ebullets.push(Object.assign({ x: e.x, y: e.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r: 7, dmg, life: 5, color, inA: true }, extra));
+      G.ebullets.push(Object.assign({ x: e.x, y: e.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r: 7, dmg, life: 5, color }, extra));
     }
   }
   function bossFan(e, a, n, step, spd, dmg, color, r = 8) {
     for (let i = 0; i < n && G.ebullets.length < 300; i++) {
       const ang = a + spreadA(i, n, step);
-      G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, r, dmg, life: 4, color, inA: true });
+      G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, r, dmg, life: 4, color });
     }
   }
 
-  // Los jefes atacan más a menudo que antes (la jaula ya os protege de la horda) y, con la mitad
+  // Los jefes atacan a menudo y, con la mitad
   // de la vida, se enfurecen: aún más rápidos, más proyectiles y se mueven más deprisa.
   const BOSS_PACE = 1.35, BOSS_RAGE_PACE = 1.75;
   function bossAI(e, dt, tg, ux, uy) {
@@ -1673,12 +1783,28 @@
         continue;
       }
       if (b.kind === 'bala') {
+        if (b.mine) {
+          // Mina: tras armarse, explota en cuanto la pisa un enemigo.
+          b.arm -= dt;
+          if (b.arm <= 0) query(b.x, b.y, b.r + 4, () => { if (!b.dead) { b.dead = true; explode(b); } });
+          continue;
+        }
+        if (b.home) steer(b, dt);
         b.x += b.vx * dt; b.y += b.vy * dt;
         query(b.x, b.y, b.r, e => {
-          if (b.dead || b.hit.has(e)) return;
-          b.hit.add(e);
+          if (b.dead) return;
+          if (b.rehit) {
+            // Golpea varias veces al mismo enemigo, con una pausa entre golpes.
+            if (G.time - (b.hits.get(e) ?? -9) < b.rehit) return;
+            b.hits.set(e, G.time);
+          } else {
+            if (b.hit.has(e)) return;
+            b.hit.add(e);
+          }
           const l = Math.hypot(b.vx, b.vy) || 1;
           hurt(e, b.dmg, b.vx / l, b.vy / l, b.kb);
+          if (b.slow) e.slow = Math.max(e.slow, b.slow);
+          if (b.leech && !b.owner.down) b.owner.hp = Math.min(b.owner.maxHp, b.owner.hp + b.leech);
           if (--b.pierce < 0) b.dead = true;
         });
       } else if (b.kind === 'cohete') {
@@ -1719,11 +1845,6 @@
     for (const b of G.ebullets) {
       b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
       if (b.life <= 0) { b.dead = true; continue; }
-      // La valla de la jaula frena los disparos de fuera (los de dentro sí pueden salir).
-      if (G.arena && !b.inA) {
-        const R = arenaR() + b.r;
-        if (dist2(b.x, b.y, G.arena.x, G.arena.y) < R * R) { b.dead = true; burst(b.x, b.y, b.color, 3, 80); continue; }
-      }
       for (const p of G.players) {
         if (!p.down && dist2(b.x, b.y, p.x, p.y) < (b.r + p.r) ** 2) {
           if (b.web && p.inv <= 0) p.slowT = 1.6;
@@ -3025,6 +3146,41 @@
         ctx.closePath(); ctx.fill();
         ctx.restore();
         gloss(b.x - b.r * 0.45, b.y - b.r * 0.45, b.r * 0.3, b.r * 0.14, -0.7, 0.4);
+      } else if (b.kind === 'bala' && b.shape === 'tornado') {
+        const r = b.r, t = now * 9 + b.x * 0.03;
+        ctx.save(); ctx.translate(b.x, b.y);
+        ctx.fillStyle = 'rgba(0,0,0,.18)';
+        ctx.beginPath(); ctx.ellipse(0, r * 0.9, r * 0.8, r * 0.3, 0, 0, TAU); ctx.fill();
+        ctx.strokeStyle = b.ev ? '#c9a3ff' : '#e6f4ff'; ctx.lineCap = 'round'; ctx.lineWidth = 3;
+        for (let i = 0; i < 5; i++) {
+          const k = i / 4, y = r * 0.9 - k * r * 2.3, wd = r * (0.3 + k * 0.95), st = (t + i * 1.3) % TAU;
+          ctx.globalAlpha = 0.9 - 0.1 * i;
+          ctx.beginPath(); ctx.ellipse(Math.sin(t * 0.7 + i) * r * 0.22, y, wd, wd * 0.3, 0, st, st + 4.2); ctx.stroke();
+        }
+        ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+        ctx.restore();
+      } else if (b.kind === 'bala' && b.shape === 'mine') {
+        const r = b.r, on = Math.sin(now * 9 + b.x) > 0;
+        ctx.fillStyle = 'rgba(0,0,0,.25)';
+        ctx.beginPath(); ctx.ellipse(b.x, b.y + r * 0.6, r, r * 0.4, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#2b2f36';
+        for (let i = 0; i < 4; i++) { const a = i / 4 * TAU + 0.785; ctx.beginPath(); ctx.arc(b.x + Math.cos(a) * r * 0.85, b.y + Math.sin(a) * r * 0.85, 2.5, 0, TAU); ctx.fill(); }
+        ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.8, 0, TAU); paint(b.ev ? '#5a3470' : '#454b55', 2);
+        ctx.fillStyle = on ? (b.ev ? '#ff7ae0' : '#ff3b3b') : '#6a1f1f';
+        ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.3, 0, TAU); ctx.fill();
+        if (on) { ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.75, 0, TAU); ctx.fill(); ctx.globalAlpha = 1; }
+      } else if (b.kind === 'bala' && b.shape === 'wisp') {
+        const r = b.r;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = b.color; ctx.globalAlpha = 0.35; ctx.lineWidth = r * 1.5;
+        ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx * 0.07, b.y - b.vy * 0.07); ctx.stroke();
+        ctx.lineCap = 'butt';
+        const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 2.2);
+        g.addColorStop(0, '#ffffff'); g.addColorStop(0.35, b.color); g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.globalAlpha = 0.9; ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(b.x, b.y, r * 2.2, 0, TAU); ctx.fill();
+        ctx.globalAlpha = 1; ctx.fillStyle = '#20304a';
+        ctx.beginPath(); ctx.arc(b.x - r * 0.3, b.y - r * 0.15, r * 0.16, 0, TAU); ctx.arc(b.x + r * 0.3, b.y - r * 0.15, r * 0.16, 0, TAU); ctx.fill();
       } else if (b.kind === 'bala') {
         // Trazadora: estela del color del arma, halo y punta blanca.
         const tl = 0.035;
@@ -3119,6 +3275,24 @@
         ctx.globalAlpha = 1; ctx.lineCap = 'butt';
         continue;
       }
+      if (f.type === 'chain') {
+        // Relámpago en zigzag que une a los enemigos alcanzados.
+        const k = f.life / f.max, P = f.pts;
+        ctx.globalAlpha = k; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        const path = [];
+        for (let i = 2; i < P.length; i += 2) {
+          const x0 = P[i - 2], y0 = P[i - 1], x1 = P[i], y1 = P[i + 1];
+          for (let j = 1; j <= 4; j++) { const t = j / 4, jt = j < 4 ? 9 : 0; path.push(x0 + (x1 - x0) * t + rand(-jt, jt), y0 + (y1 - y0) * t + rand(-jt, jt)); }
+        }
+        for (const [lw, col] of [[8, f.ev ? 'rgba(255,120,240,.45)' : 'rgba(120,200,255,.45)'], [2.5, '#ffffff']]) {
+          ctx.strokeStyle = col; ctx.lineWidth = lw;
+          ctx.beginPath(); ctx.moveTo(P[0], P[1]);
+          for (let i = 0; i < path.length; i += 2) ctx.lineTo(path[i], path[i + 1]);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+        continue;
+      }
       if (f.type === 'ring') {
         const k = f.life / f.max, R = f.R * (1.05 - 0.6 * k);
         ctx.globalAlpha = k;
@@ -3198,42 +3372,6 @@
   }
 
   // Lo que va pegado al suelo (debajo de los enemigos): charcos de veneno y sombras de meteoros.
-  // Jaula del jefe: el exterior se oscurece y una valla de estacas con brasas rodea el círculo.
-  function drawArena() {
-    const a = G.arena;
-    if (!a) return;
-    const R = arenaR(a), k = Math.min(1, a.t / ARENA_CLOSE), pulse = 0.75 + Math.sin(G.time * 4) * 0.25;
-    ctx.save();
-    ctx.globalAlpha = k;
-    ctx.fillStyle = 'rgba(2,1,8,.55)';
-    ctx.beginPath(); ctx.rect(camX - 10, camY - 10, CVW + 20, CVH + 20); ctx.arc(a.x, a.y, R, 0, TAU, true); ctx.fill('evenodd');
-    // Suelo de la arena iluminado desde el borde con el color del jefe.
-    const gl = ctx.createRadialGradient(a.x, a.y, R * 0.55, a.x, a.y, R);
-    gl.addColorStop(0, 'rgba(0,0,0,0)'); gl.addColorStop(1, a.color);
-    ctx.globalAlpha = k * 0.16;
-    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(a.x, a.y, R, 0, TAU); ctx.fill();
-    ctx.globalAlpha = k;
-    ctx.strokeStyle = a.color; ctx.lineWidth = 10; ctx.globalAlpha = k * 0.18 * pulse;
-    ctx.beginPath(); ctx.arc(a.x, a.y, R, 0, TAU); ctx.stroke();
-    ctx.lineWidth = 2.5; ctx.globalAlpha = k * 0.7;
-    ctx.beginPath(); ctx.arc(a.x, a.y, R, 0, TAU); ctx.stroke();
-    // Estacas (solo las que se ven).
-    const n = Math.max(24, Math.round(TAU * R / 34)), H_ = 24;
-    ctx.globalAlpha = k;
-    for (let i = 0; i < n; i++) {
-      const an = i / n * TAU + (1 - k) * 1.5, x = a.x + Math.cos(an) * R, y = a.y + Math.sin(an) * R;
-      if (!inView(x, y, 40)) continue;
-      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(x, y + 1, 6, 2.5, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#2a2236';
-      ctx.beginPath(); ctx.moveTo(x - 3.5, y); ctx.lineTo(x - 3.5, y - H_); ctx.lineTo(x, y - H_ - 7); ctx.lineTo(x + 3.5, y - H_); ctx.lineTo(x + 3.5, y); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(x - 3.5, y - H_, 1.5, H_);
-      ctx.fillStyle = a.color; ctx.globalAlpha = k * pulse;
-      ctx.beginPath(); ctx.arc(x, y - H_ - 3, 2.2, 0, TAU); ctx.fill();
-      ctx.globalAlpha = k;
-    }
-    ctx.restore();
-  }
-
   function drawGroundFx() {
     for (const b of G.bullets) {
       if (b.kind !== 'charco' && b.kind !== 'meteoro') continue;
@@ -3797,7 +3935,6 @@
       ctx.translate(-camX, -camY);
       drawGround();
       drawGroundFx();
-      drawArena();
       drawWeaponsWorld();
       drawGems();
       drawPickups();
@@ -4407,7 +4544,6 @@
     const snap = {
       t: 's', time: G.time, k: G.kills, g: G.gold, sh: r1(G.shake),
       b: G.boss && !G.boss.dead ? [G.boss.name, R(G.boss.hp), R(G.boss.maxHp), G.boss.color] : 0,
-      ar: G.arena ? [R(G.arena.x), R(G.arena.y), R(G.arena.R), G.arena.color, r1(G.arena.t)] : 0,
       p: G.players.map(p => [r1(p.x), r1(p.y), r1(p.hp), p.maxHp, p.down ? 1 : 0, r1(p.reviveT), r1(p.face.x), r1(p.face.y),
         p.side, r1(p.walk), r1(p.inv), p.revives, Math.round(p.stats.speed * (p.slowT > 0 ? 0.55 : 1) * 100) / 100,
         p.weapons.map(w => [w.id, w.lvl, w.evolved ? 1 : 0, Math.round(w.angle * 100) / 100, w.n || 0, r1(w.R || 0), r1(w.br || 0)]),
@@ -4452,7 +4588,7 @@
     const n = m.chars.length;
     G = {
       online: 'guest', localIdx: m.you || 1, coop: true, map: mapById(m.map), names: m.names,
-      time: 0, kills: 0, gold: 0, shake: 0, boss: null, arena: null, cx: 0, cy: 0,
+      time: 0, kills: 0, gold: 0, shake: 0, boss: null, cx: 0, cy: 0,
       players: m.chars.map((c, i) => viewPlayer(charById(c), i, (i - (n - 1) / 2) * 60)),
       enemies: [], emap: new Map(), bullets: [], ebullets: [], gems: [], pickups: [], particles: [], texts: [], effects: [],
       snapT: performance.now(), snapDt: 0.05, sendT: 0, guestOpts: null, opts: [],
@@ -4469,11 +4605,6 @@
     G.time = sn.time; G.kills = sn.k; G.gold = sn.g;
     G.shake = Math.max(G.shake, sn.sh || 0);
     G.boss = sn.b ? { name: sn.b[0], hp: sn.b[1], maxHp: sn.b[2], color: sn.b[3], dead: false } : null;
-    if (sn.ar) {
-      const [x, y, R, color, t] = sn.ar;
-      if (!G.arena) G.arena = { x, y, R, color, t };
-      Object.assign(G.arena, { x, y, R, color });
-    } else G.arena = null;
     sn.p.forEach((v, i) => {
       const p = G.players[i];
       if (!p) return;
@@ -4530,12 +4661,14 @@
       case 't': addText(ev[1], ev[2], ev[3], ev[4]); break;
       case 'b': burst(ev[1], ev[2], ev[3], ev[4], ev[5]); break;
       case 'm': toast(ev[1]); break;
+      case 'd': deathAlert(ev[1], ev[2], true); break;
       case 'z': G.effects.push({ type: 'bolt', x: ev[1], y: ev[2], R: ev[3], life: 0.3, max: 0.3, seed: ev[4], ev: !!ev[5] }); break;
       case 'k': G.effects.push({ type: 'slash', x: ev[1], y: ev[2], a: ev[3], R: ev[4], arc: ev[5], color: ev[6], life: 0.22, max: 0.22 }); break;
       case 'r': G.effects.push({ type: 'ring', x: ev[1], y: ev[2], R: ev[3], color: ev[4], life: 0.4, max: 0.4 }); break;
       case 'p': G.effects.push({ type: 'punch', x: ev[1], y: ev[2], a: ev[3], R: ev[4], life: 0.28, max: 0.28 }); break;
       case 'x': G.effects.push({ type: 'boom', x: ev[1], y: ev[2], R: ev[3], life: 0.35, max: 0.35 }); break;
       case 'w': G.effects.push({ type: 'whip', x: ev[1], y: ev[2], a: ev[3], R: ev[4], h: ev[5], ev: !!ev[6], life: 0.25, max: 0.25 }); break;
+      case 'c': G.effects.push({ type: 'chain', pts: ev[1], ev: !!ev[2], life: 0.25, max: 0.25 }); break;
       case 'i': G.effects.push({ type: 'ice', x: ev[1], y: ev[2], R: ev[3], life: 0.45, max: 0.45 }); break;
     }
   }
@@ -4559,12 +4692,10 @@
     for (const q of G.pickups) q.t += dt;
 
     const me = G.players[G.localIdx];
-    if (G.arena) G.arena.t += dt;
     if (state === 'play' && !me.down) {
       const { dx, dy } = inputDir(G.localIdx);
       const sp = 170 * me.stats.speed;
       me.x += dx * sp * dt; me.y += dy * sp * dt;
-      if (G.arena) arenaKeep(me, true);
       if (dx || dy) {
         const l = Math.hypot(dx, dy);
         me.face = { x: dx / l, y: dy / l };
