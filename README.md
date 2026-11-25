@@ -11,7 +11,8 @@ Sobrevive 10 minutos a oleadas cada vez más grandes de monstruos y derrota al *
 - **Subir de nivel:** recoge los cristales que sueltan los enemigos y elige 1 de 3 mejoras.
 - **Evolucionar:** lleva un arma a **Nv. 5**, consigue su objeto clave y abre un **cofre** (lo sueltan élites y jefes).
 - **Pausa:** `P` / `Esc` o el botón ❚❚. Al continuar hay una cuenta atrás de 3 segundos.
-- **Jaula del jefe:** cuando aparece un jefe se cierra un círculo de estacas a vuestro alrededor. No se puede salir: dentro solo estáis vosotros, el jefe y lo que invoque; la horda y sus disparos se quedan fuera. A cambio, los jefes atacan más a menudo y, a media vida, se enfurecen (más rápidos y con más proyectiles). La jaula se abre al derrotarlo.
+- **Jefes:** atacan a menudo y, a media vida, se enfurecen (aura roja, más rápidos y con más proyectiles).
+- **Mejoras nuevas en partida:** armas ⛓️ Cadena Eléctrica (evoluciona con 🔮 Cristal de Maná), 🌪️ Torbellino (con 🦇 Capa Sombría), 💣 Minas Saltarinas (con 🌵 Cota de Espinas), 👻 Espíritus Errantes (con 🦷 Colmillo Vampírico) y 🪨 Pisotón Sísmico (con 🍀 Trébol de la Suerte).
 
 ### Cooperativo local (2 jugadores)
 
@@ -25,7 +26,7 @@ En la pantalla de selección, elige **👥 2 jugadores (local)** y un personaje 
 
 - La **experiencia, el nivel y el oro** son compartidos. Las mejoras se eligen **por turnos**: cada subida de nivel le toca a un jugador, que mejora sus propias armas.
 - La cámara sigue a los dos, y ninguno puede salirse de la pantalla.
-- Si un jugador **cae**, su compañero lo reanima quedándose a su lado 3 segundos. Si el caído está fuera de la pantalla, una flecha indica dónde está. La partida termina cuando caen los dos.
+- Si un jugador **cae**, sale un aviso grande en rojo y su compañero lo reanima quedándose a su lado 3 segundos. Si el caído está fuera de la pantalla, una flecha indica dónde está. La partida termina cuando caen los dos.
 - Hay más enemigos, más resistentes y con jefes más duros, pero se sube de nivel más rápido.
 - Con mando: **Start** pausa y **A/B/X/Y** eligen la mejora 1-4.
 

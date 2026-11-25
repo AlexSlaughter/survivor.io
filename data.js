@@ -52,6 +52,31 @@ window.HN_DATA = {
       up: ['Más daño', 'Charco más grande y duradero', '+1 frasco', 'Más daño y charco más grande'],
       evo: 'lupa', evoName: 'Pantano Pestilente',
     },
+    cadena: {
+      name: 'Cadena Eléctrica', icon: '⛓️', desc: 'Un relámpago salta de enemigo en enemigo.',
+      up: ['+1 salto', 'Más daño y saltos más largos', '+1 salto', 'Más daño y recarga más rápida'],
+      evo: 'mana', evoName: 'Red de Relámpagos',
+    },
+    torbellino: {
+      name: 'Torbellino', icon: '🌪️', desc: 'Lanza un remolino lento que golpea una y otra vez a lo que atraviesa.',
+      up: ['Más daño', '+1 torbellino', 'Dura más y es más grande', 'Más daño y recarga más rápida'],
+      evo: 'capa', evoName: 'Huracán Sombrío',
+    },
+    minas: {
+      name: 'Minas Saltarinas', icon: '💣', desc: 'Siembra minas a tu alrededor que explotan al pisarlas.',
+      up: ['Más daño', 'Explosión más grande', '+1 mina', 'Más daño y recarga más rápida'],
+      evo: 'espinas', evoName: 'Campo Minado',
+    },
+    espiritus: {
+      name: 'Espíritus Errantes', icon: '👻', desc: 'Espíritus que persiguen a los enemigos.',
+      up: ['+1 espíritu', 'Más daño', '+1 espíritu', 'Atraviesan a un enemigo'],
+      evo: 'colmillo', evoName: 'Almas Hambrientas',
+    },
+    terremoto: {
+      name: 'Pisotón Sísmico', icon: '🪨', desc: 'Una onda sísmica a tu alrededor que daña, aparta y ralentiza.',
+      up: ['Más radio y daño', 'Más daño y recarga más rápida', 'Más radio y daño', 'Más daño y recarga más rápida'],
+      evo: 'trebol', evoName: 'Cataclismo',
+    },
   },
 
   // Armas principales: el ataque principal de cualquier personaje. Todos empiezan con el básico;
@@ -133,6 +158,11 @@ window.HN_DATA = {
     tomo:    { name: 'Tomo Duplicador', icon: '📘', desc: '+1 proyectil para todas las armas.', max: 2, apply: p => { p.stats.proj += 1; } },
     coraza:  { name: 'Coraza de Hierro', icon: '🛡️', desc: '+1 armadura (menos daño recibido).', max: 5, apply: p => { p.stats.armor += 1; } },
     pergamino: { name: 'Pergamino Sabio', icon: '📜', desc: '+10% de experiencia.',             max: 5, apply: p => { p.stats.xp += 0.10; } },
+    capa:    { name: 'Capa Sombría',    icon: '🦇', desc: '+6% de probabilidad de esquivar un golpe.', max: 5, apply: p => { p.stats.dodge += 0.06; } },
+    espinas: { name: 'Cota de Espinas', icon: '🌵', desc: 'Al recibir un golpe, dañas y apartas a los enemigos cercanos.', max: 5, apply: p => { p.stats.thorns += 15; } },
+    colmillo: { name: 'Colmillo Vampírico', icon: '🦷', desc: '+6% de probabilidad de curarte 2 de vida al derrotar a un enemigo cercano.', max: 5, apply: p => { p.stats.leech += 0.06; } },
+    trebol:  { name: 'Trébol de la Suerte', icon: '🍀', desc: '+25% de monedas, comida e imanes que sueltan los enemigos.', max: 5, apply: p => { p.stats.luck += 0.25; } },
+    mana:    { name: 'Cristal de Maná', icon: '🔮', desc: 'Un escudo bloquea un golpe cada pocos segundos (más a menudo con cada nivel).', max: 5, apply: p => { p.stats.mana += 1; } },
   },
 
   ETYPES: {
