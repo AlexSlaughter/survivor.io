@@ -536,6 +536,7 @@
 
   function kill(e) {
     e.dead = true;
+    if (!e.boss) dieFx(e);
     G.kills++;
     sfx('kill', 0.04);
     burst(e.x, e.y, e.color, e.boss ? 50 : e.elite ? 20 : 6, e.boss ? 260 : 120);
@@ -1475,7 +1476,7 @@
     if (t.zigzag) e.zig = true;
     if (t.heavy) e.heavy = true;
     e.maxHp = e.hp;
-    e.id = ++G.eid;
+    e.id = ++G.eid; e.born = G.time;
     G.enemies.push(e);
     return e;
   }
@@ -1497,7 +1498,7 @@
       flash: 0, kx: 0, ky: 0, slow: 0, frz: 0, boss: true, final: b.final, name: b.name, shots: b.shots,
       ai: b.ai || 'ring', variant: BOSSES.indexOf(b), shotT: 3, sumT: 2, chT: 4, mode: 0, wob: 0, phase: 0,
     };
-    e.id = ++G.eid;
+    e.id = ++G.eid; e.born = G.time;
     G.enemies.push(e);
     G.boss = e;
     G.shake = 10;
@@ -2288,9 +2289,40 @@
     ctx = pc; FLASH = flash;
     drawEnemyBody({ type: e.type, color: e.color, r, wob: f * SPR_P / SPR_N, warn: false, flash: flash ? 1 : 0 }, e.color, r, r * 0.25, 1, Math.max(1.8, Math.min(4, r * 0.14)), 0);
     ctx = saved; FLASH = false;
+    if (!flash) {
+      // Volumen: luz arriba a la izquierda y sombra abajo a la derecha, solo sobre el dibujo.
+      pc.setTransform(1, 0, 0, 1, 0, 0);
+      pc.globalCompositeOperation = 'source-atop';
+      const sg = pc.createLinearGradient(0, 0, c.width * 0.7, c.height);
+      sg.addColorStop(0, 'rgba(255,250,235,.22)'); sg.addColorStop(0.45, 'rgba(255,255,255,0)'); sg.addColorStop(1, 'rgba(12,6,32,.35)');
+      pc.fillStyle = sg; pc.fillRect(0, 0, c.width, c.height);
+      pc.globalCompositeOperation = 'source-over';
+    }
     s = { c, x: -w, y: -top, w: w * 2, h: top + bot };
     sprites.set(key, s);
     return s;
+  }
+
+  // Animación de muerte: el enemigo se pone blanco, se aplasta contra el suelo y se desvanece.
+  function dieFx(e) {
+    if (!SPRITE_TYPES.has(e.type) || G.effects.length > 260) return;
+    G.effects.push({ type: 'die', x: e.x, y: e.y, et: e.type, color: e.color, r: e.r, wob: e.wob || 0, sd: e.x > G.p.x ? 1 : -1, life: 0.32, max: 0.32 });
+  }
+  function drawDie(f) {
+    if (!inView(f.x, f.y, f.r * 3)) return;
+    const k = f.life / f.max, q = 1 - k;
+    const fr = Math.floor((((f.wob % SPR_P) + SPR_P) % SPR_P) / SPR_P * SPR_N) % SPR_N;
+    const s = enemySprite({ type: f.et, color: f.color }, f.r, fr, k > 0.55);
+    ctx.save();
+    ctx.translate(f.x, f.y + f.r * 0.9);
+    ctx.rotate(f.sd * q * 0.7);
+    ctx.scale((1 + q * 0.5) * -f.sd, Math.max(0.05, 1 - q * 0.95));
+    ctx.globalAlpha = Math.min(1, k * 2);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(s.c, s.x, s.y - f.r * 0.9, s.w, s.h);
+    ctx.imageSmoothingEnabled = true;
+    ctx.restore();
+    ctx.globalAlpha = 1;
   }
 
   function drawEnemy(e) {
@@ -2312,9 +2344,13 @@
     if (G && ctx === mainCtx && !e.boss && !e.warn && SPRITE_TYPES.has(e.type)) {
       const f = Math.floor((((e.wob % SPR_P) + SPR_P) % SPR_P) / SPR_P * SPR_N) % SPR_N;
       const s = enemySprite(e, r, f, e.flash > 0);
+      // Animación: aparece con un saltito, se balancea al andar y se aplasta al recibir un golpe.
+      const pop = Math.min(1, (t - (e.born ?? -9)) / 0.28), sp = pop < 1 ? 1 + Math.sin(pop * Math.PI) * 0.25 - (1 - pop) * 0.9 : 1;
+      const hitK = e.flash > 0 ? 1 : 0, sx = sp * (1 + hitK * 0.16), sy = sp * (1 - hitK * 0.14) * (1 + Math.sin(e.wob * 2) * 0.035);
+      const pv = r * 0.9;
+      ctx.translate(0, pv); ctx.rotate(Math.sin(e.wob) * 0.07); ctx.scale(sx * (sd < 0 ? -1 : 1), sy); ctx.translate(0, -pv);
       ctx.imageSmoothingEnabled = false;   // el sprite ya está a la escala de la pantalla
-      if (sd < 0) { ctx.scale(-1, 1); ctx.drawImage(s.c, s.x, s.y, s.w, s.h); ctx.scale(-1, 1); }
-      else ctx.drawImage(s.c, s.x, s.y, s.w, s.h);
+      ctx.drawImage(s.c, s.x, s.y, s.w, s.h);
       ctx.imageSmoothingEnabled = true;
     } else {
       FLASH = e.flash > 0;
@@ -3289,6 +3325,7 @@
         ctx.globalAlpha = 1; ctx.lineCap = 'butt';
         continue;
       }
+      if (f.type === 'die') { drawDie(f); continue; }
       if (f.type === 'chain') {
         // Relámpago en zigzag que une a los enemigos alcanzados.
         const k = f.life / f.max, P = f.pts;
@@ -4409,8 +4446,8 @@
     for (let i = 0; i < 18; i++) { const y = cy - bh / 2 + ((i * 37 + c.t * 900) % bh), x = ((i * 173 + c.t * 2400) % (W + 300)) - 150; ctx.moveTo(x, y); ctx.lineTo(x + 120 + (i % 3) * 60, y - 6); }
     ctx.stroke();
     // Personaje en grande.
-    const hr = bh * 0.32, sz = Math.min(W * 0.16, bh * 0.4);
-    drawHero(W * 0.2, cy + hr * 0.4, sz, c.ch, { x: 1, y: 0, side: 1, walk: 0 }, 0, false);
+    const sz = Math.min(W * 0.12, bh * 0.26) / (c.ch.tall || 1);
+    drawHero(W * 0.2, cy + bh * 0.28, sz, c.ch, { x: 1, y: 0, side: 1, walk: 0 }, 0, false);
     ctx.restore();
     // Texto.
     const u = c.ch.ult;
@@ -5181,7 +5218,7 @@
     for (const v of sn.e) {
       const [id, ti, x, y, f, r, hpk, variant, ca] = v;
       let e = G.emap.get(id);
-      if (!e) { e = { id, x, y, wob: rand(0, TAU), flash: 0 }; G.emap.set(id, e); }
+      if (!e) { e = { id, x, y, wob: rand(0, TAU), flash: 0, born: sn.time }; G.emap.set(id, e); }
       e.px = e.x; e.py = e.y; e.tx = x; e.ty = y;
       if (dist2(e.x, e.y, x, y) > 300 * 300) { e.px = x; e.py = y; }
       e.type = ETYPE_IDS[ti]; e.elite = !!(f & 2); e.boss = !!(f & 4); e.final = !!(f & 8); e.warn = !!(f & 16); e.rage = !!(f & 32);
@@ -5192,7 +5229,13 @@
       e.color = e.boss ? (G.boss ? G.boss.color : '#8a5cff') : G.map.colors[e.type] || ETYPES[e.type].color;
       seen.add(id); list.push(e);
     }
-    for (const id of [...G.emap.keys()]) if (!seen.has(id)) G.emap.delete(id);
+    const me = G.players[G.localIdx];
+    for (const [id, e] of [...G.emap]) {
+      if (seen.has(id)) continue;
+      // Si desaparece cerca de nosotros, es que ha muerto: animación de muerte.
+      if (me && !e.boss && Math.abs(e.x - me.x) < VW / 2 && Math.abs(e.y - me.y) < VH / 2) dieFx(e);
+      G.emap.delete(id);
+    }
     G.enemies = list;
     G.bullets = sn.bu.map(v => {
       const b = { kind: BULLET_IDS[v[0]], x: v[1], y: v[2], vx: v[3], vy: v[4], r: v[5], ev: !!v[6], rot: v[7], color: v[8] || '#fff', shape: v[9] || null, skin: v[9] || null };
