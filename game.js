@@ -2266,7 +2266,7 @@
   // ---------- Sprites generados (Hugging Face / FLUX) ----------
   // Si una imagen no carga, se usa el dibujo a mano de siempre.
   // dir: hacia dónde mira la imagen original (1 derecha, -1 izquierda).
-  const HERO_IMG_DIR = { marc: 1, salim: 1, alex: 1, pol: 1, igor: -1, ivan: 1 };
+  const HERO_IMG_DIR = { marc: 1, salim: 1, alex: 1, pol: 1, igor: -1, ivan: -1 };
   // Enemigos: tamaño en radios (alto «h» o ancho «w»), color base de la imagen (para teñirla en cada mapa) y dirección.
   // base: color de la imagen en el bosque (los demás mapas la tiñen); sin base, la imagen no se tiñe.
   const ENEMY_IMG = {
@@ -2295,7 +2295,7 @@
       IMGS[id] = im; sprites.clear();
       if (!G && !$('select').classList.contains('hidden')) renderSelect();
     };
-    im.src = `sprites/${id}.png?v=1`;
+    im.src = `sprites/${id}.png?v=2`;
   }
   for (const id in HERO_IMG_DIR) loadImg(id);
   for (const id in ENEMY_IMG) loadImg(id);
