@@ -1246,7 +1246,6 @@
   Object.assign(W_UPDATE, MAIN_UPDATE);
 
   // ---------- Subida de nivel ----------
-  const LATE_UPS = new Set(['cadena', 'torbellino', 'minas', 'espiritus', 'terremoto', 'capa', 'espinas', 'colmillo', 'trebol', 'mana']);
   function buildOptions(p, count) {
     const o = [];
     for (const w of p.weapons) if (!w.evolved && w.lvl < WMAX) o.push({ k: 'w', id: w.id });
@@ -1254,20 +1253,15 @@
     const owned = Object.keys(p.passives);
     for (const id of owned) if (p.passives[id] < PASSIVES[id].max) o.push({ k: 'p', id });
     if (owned.length < SLOTS) for (const id in PASSIVES) if (!p.passives[id]) o.push({ k: 'np', id });
-    // Sorteo ponderado: lo que salió en la subida anterior (o antes de cambiar opciones) pesa menos,
-    // para que no se repitan siempre las mismas, y se intenta mezclar armas y pasivas.
+    // Sorteo: todas pesan lo mismo; solo lo que salió en la subida anterior pesa menos,
+    // para que no se repitan siempre las mismas.
     const key = q => (q.k === 'w' || q.k === 'nw' ? 'w:' : 'p:') + q.id;
     const recent = p.recentOpts || {};
-    const isW = q => q.k === 'w' || q.k === 'nw';
-    // Las armas y pasivas añadidas más tarde salen algo menos como novedad, para que no tapen a las clásicas.
-    const pool = shuffle(o).map(q => ({ q, wt: (recent[key(q)] ? 0.3 : 1) * ((q.k === 'nw' || q.k === 'np') && LATE_UPS.has(q.id) ? 0.55 : 1) }));
+    const pool = shuffle(o).map(q => ({ q, wt: recent[key(q)] ? 0.3 : 1 }));
     const r = [];
     while (r.length < count && pool.length) {
-      // Si ya hay 2 del mismo tipo y quedan del otro, el siguiente es del otro tipo.
-      const nW = r.filter(isW).length, nP = r.length - nW;
-      let cand = pool;
-      if (nW >= 2 && pool.some(c => !isW(c.q))) cand = pool.filter(c => !isW(c.q));
-      else if (nP >= 2 && pool.some(c => isW(c.q))) cand = pool.filter(c => isW(c.q));
+      // Todas las mejoras tienen la misma probabilidad (sin forzar la mezcla de armas y pasivas).
+      const cand = pool;
       let x = Math.random() * cand.reduce((a, c) => a + c.wt, 0), ch = cand[cand.length - 1];
       for (const c of cand) { x -= c.wt; if (x <= 0) { ch = c; break; } }
       r.push(ch.q);
