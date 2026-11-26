@@ -225,7 +225,7 @@ window.HN_DATA = {
       desc: 'Tan guapo que todo va hacia él: +40% recogida y +15% experiencia. Además, +10% daño y +5% velocidad.',
       mods: { magnet: 0.40, xp: 0.15, dmg: 0.10, speed: 0.05 },
       body: '#f1c27d', hood: '#f2cf5b', cloak: '#1f3a93', acc: 'cool',
-      ult: { id: 'charm', name: 'Belleza Cegadora', icon: '💖', desc: 'Un destello tan guapo que daña y deja embobados a todos los enemigos de la pantalla.' },
+      ult: { id: 'charm', name: 'Belleza Cegadora', icon: '💖', desc: 'Un destello tan guapo que daña a todos los enemigos de la pantalla; los que sobreviven se enamoran 5 s y huyen de ti sin atacarte.' },
     },
     {
       id: 'pol', name: 'Pol', title: 'el Flaco', cost: 500,
