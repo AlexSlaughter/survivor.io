@@ -10,6 +10,7 @@ Sobrevive 10 minutos a oleadas cada vez más grandes de monstruos y derrota al *
 - **Atacar:** automático; tus armas disparan solas.
 - **Subir de nivel:** recoge los cristales que sueltan los enemigos y elige 1 de 3 mejoras.
 - **Evolucionar:** lleva un arma a **Nv. 5**, consigue su objeto clave y abre un **cofre** (lo sueltan élites y jefes).
+- **Ulti:** cada personaje tiene una definitiva propia que se usa **una vez por partida**: `Q` o `Espacio` (J2 en local: `Intro`), LB/RB/Y en el mando o el botón redondo de abajo a la derecha.
 - **Pausa:** `P` / `Esc` o el botón ❚❚. Al continuar hay una cuenta atrás de 3 segundos.
 - **Jefes:** atacan a menudo y, a media vida, se enfurecen (aura roja, más rápidos y con más proyectiles).
 - **Mejoras nuevas en partida:** armas ⛓️ Cadena Eléctrica (evoluciona con 🔮 Cristal de Maná), 🌪️ Torbellino (con 🦇 Capa Sombría), 💣 Minas Saltarinas (con 🌵 Cota de Espinas), 👻 Espíritus Errantes (con 🦷 Colmillo Vampírico) y 🪨 Pisotón Sísmico (con 🍀 Trébol de la Suerte).
@@ -215,4 +216,5 @@ Para publicarlo gratis, activa **GitHub Pages** en *Settings → Pages* con esta
 - `net.js`: conexión directa entre jugadores (WebRTC) para el cooperativo online.
 - `firebase-config.js`: configuración de tu proyecto de Firebase.
 - `firestore.rules`: reglas de seguridad de la base de datos.
+- `sprites/`: dibujos de personajes y enemigos generados con FLUX.1 [schnell] (en Hugging Face y Cloudflare Workers AI), con el fondo quitado y recortados. Si alguno no carga, el juego usa el dibujo hecho con código.
 - `game.js`: motor del juego (entrada, aparición de enemigos, armas, colisiones con rejilla espacial, renderizado, menús y guardado).

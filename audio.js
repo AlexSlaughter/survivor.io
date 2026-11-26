@@ -80,6 +80,7 @@ window.Sound = (() => {
     lose:   () => seq([392, 349, 311, 262], 0.2, { type: 'sawtooth', d: 0.35, v: 0.1 }),
     buy:    () => { tone(880, { type: 'square', d: 0.07, v: 0.08 }); tone(1320, { type: 'square', d: 0.15, v: 0.08, t: 0.07 }); },
     error:  () => tone(160, { type: 'square', d: 0.15, v: 0.1 }),
+    ult:    () => { tone(60, { f2: 30, type: 'sawtooth', d: 1.0, v: 0.25 }); noise({ d: 0.9, v: 0.25, freq: 900 }); seq([392, 523, 659, 784, 1047], 0.05, { type: 'square', d: 0.25, v: 0.08 }); noise({ d: 0.5, v: 0.12, freq: 6000, ftype: 'highpass', t: 0.25 }); },
     revive: () => seq([262, 392, 523, 784, 1047], 0.06, { type: 'sine', d: 0.4, v: 0.18 }),
   };
 
