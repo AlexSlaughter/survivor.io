@@ -2266,10 +2266,26 @@
   // dir: hacia dónde mira la imagen original (1 derecha, -1 izquierda).
   const HERO_IMG_DIR = { marc: 1, salim: 1, alex: 1, pol: 1, igor: -1, ivan: 1 };
   // Enemigos: tamaño en radios (alto «h» o ancho «w»), color base de la imagen (para teñirla en cada mapa) y dirección.
+  // base: color de la imagen en el bosque (los demás mapas la tiñen); sin base, la imagen no se tiñe.
   const ENEMY_IMG = {
     slime: { h: 2.6, base: '#5fd068', dir: -1 },
     murcielago: { w: 4.4, base: '#a77bf3', dir: 1 },
+    espectro: { h: 2.7, base: '#7fd6ff', dir: -1 },
+    bruto: { h: 3.0, base: '#ff6b5b', dir: -1 },
+    escupidor: { h: 2.9, dir: -1 },
+    brujo: { h: 3.0, dir: -1 },
+    arana: { w: 4.0, dir: 1 },
+    lobo: { w: 4.3, dir: -1 },
+    calabaza: { h: 2.8, dir: 1 },
+    golem: { h: 2.6, dir: 1 },
+    invocador: { h: 3.0, dir: -1 },
+    // Jefes: Reina Araña, Coloso de Obsidiana, Dragón de Hueso y Rey del Abismo.
+    boss0: { w: 3.5, dir: 1 },
+    boss1: { h: 3.1, dir: 1 },
+    boss2: { w: 3.8, dir: 1 },
+    boss3: { h: 3.3, dir: 1 },
   };
+  const imgKey = e => (e.boss ? 'boss' + (e.variant ?? 3) : e.type);
   const IMGS = {};
   function loadImg(id) {
     const im = new Image();
@@ -2315,7 +2331,7 @@
       c.width = Math.max(1, Math.round(dw * k)); c.height = Math.max(1, Math.round(dh * k));
       const pc = c.getContext('2d');
       if (fit.dir < 0) { pc.translate(c.width, 0); pc.scale(-1, 1); }
-      const hr = ((hueOf(e.color) - hueOf(fit.base)) % 360 + 360) % 360;
+      const hr = fit.base && e.color ? ((hueOf(e.color) - hueOf(fit.base)) % 360 + 360) % 360 : 0;
       if (hr > 4 && hr < 356) pc.filter = `hue-rotate(${hr | 0}deg)`;
       pc.drawImage(im, 0, 0, c.width, c.height);
       pc.filter = 'none';
@@ -2350,7 +2366,7 @@
 
   // Animación de muerte: el enemigo se pone blanco, se aplasta contra el suelo y se desvanece.
   function dieFx(e) {
-    if (!SPRITE_TYPES.has(e.type) || G.effects.length > 260) return;
+    if (!(SPRITE_TYPES.has(e.type) || IMGS[e.type]) || G.effects.length > 260) return;
     G.effects.push({ type: 'die', x: e.x, y: e.y, et: e.type, color: e.color, r: e.r, wob: e.wob || 0, sd: e.x > G.p.x ? 1 : -1, life: 0.32, max: 0.32 });
   }
   function drawDie(f) {
@@ -2386,16 +2402,29 @@
       ctx.strokeStyle = `rgba(255,90,90,${0.5 + 0.4 * k})`; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(0, 0, r * (1.2 + 0.1 * k), 0, TAU); ctx.stroke();
     }
-    if (G && ctx === mainCtx && !e.boss && !e.warn && SPRITE_TYPES.has(e.type)) {
+    const ik = imgKey(e), useImg = !!(IMGS[ik] && ENEMY_IMG[ik]);
+    if (G && ctx === mainCtx && (useImg || (!e.boss && !e.warn && SPRITE_TYPES.has(e.type)))) {
       const f = Math.floor((((e.wob % SPR_P) + SPR_P) % SPR_P) / SPR_P * SPR_N) % SPR_N;
-      const s = enemySprite(e, r, f, e.flash > 0);
+      const s = enemySprite(useImg ? { type: ik, color: e.boss ? null : e.color } : e, r, f, e.flash > 0);
+      if (useImg && e.warn) {
+        // Avisa de un ataque (embestida, mecha encendida): brillo rojo que late.
+        const k = 0.5 + 0.5 * Math.sin(t * 16);
+        ctx.fillStyle = `rgba(255,50,50,${0.2 + 0.25 * k})`;
+        ctx.beginPath(); ctx.ellipse(0, 0, r * 1.7, r * 1.25, 0, 0, TAU); ctx.fill();
+        if (e.type === 'calabaza') {
+          ctx.strokeStyle = 'rgba(255,90,60,.7)'; ctx.lineWidth = 2; ctx.setLineDash([6, 6]); ctx.lineDashOffset = -t * 30;
+          ctx.beginPath(); ctx.arc(0, 0, ETYPES.calabaza.bomb.R, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+        }
+      }
       // Animación: aparece con un saltito, se balancea al andar y se aplasta al recibir un golpe.
       const pop = Math.min(1, (t - (e.born ?? -9)) / 0.28), sp = pop < 1 ? 1 + Math.sin(pop * Math.PI) * 0.25 - (1 - pop) * 0.9 : 1;
       const hitK = e.flash > 0 ? 1 : 0;
       let sx = sp * (1 + hitK * 0.16), sy = sp * (1 - hitK * 0.14) * (1 + Math.sin(e.wob * 2) * 0.035);
-      if (IMGS[e.type]) {
+      if (useImg) {
+        if (e.boss) { const q = Math.sin(t * 2.5) * 0.03; sx *= 1 - q; sy *= 1 + q; }
         // Con imagen: el slime se estira y se aplasta; el murciélago aletea.
         if (e.type === 'slime') { const q = Math.sin(e.wob * 2) * 0.09; sx *= 1 + q; sy *= 1 - q; }
+        else if (e.type === 'espectro') ctx.translate(0, Math.sin(e.wob * 1.5) * r * 0.18);
         else if (e.type === 'murcielago') { sy *= 1 + Math.sin(e.wob * 5) * 0.13; ctx.translate(0, Math.sin(e.wob * 2.5) * r * 0.25); }
       }
       const pv = r * 0.9;
