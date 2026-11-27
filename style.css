@@ -483,3 +483,9 @@ h2::before, h2::after { content: "✦"; font-family: Nunito, sans-serif; font-si
 }
 /* Al desplazarse (también con el teclado), lo que queda bajo la barra fija se sube para que no se tape. */
 .panel { scroll-padding-bottom: 96px; }
+
+/* Modo Hardcore */
+.hardRow { margin: 0 0 12px; }
+.hardRow .sub { margin: 6px auto 0; max-width: 560px; }
+.hardBtn { margin: 0; }
+.hardBtn.on { color: #fff; background: #b3263f; box-shadow: 0 2px 0 #7a1528; }

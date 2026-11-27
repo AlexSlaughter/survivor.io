@@ -156,11 +156,11 @@ window.HN_DATA = {
     iman:    { name: 'Imán Lunar',      icon: '🧲', desc: '+30% radio de recogida.',            max: 5, apply: p => { p.stats.magnet += 0.30; } },
     lupa:    { name: 'Lente Prisma',    icon: '🔍', desc: '+10% área de ataque.',               max: 5, apply: p => { p.stats.area += 0.10; } },
     tomo:    { name: 'Tomo Duplicador', icon: '📘', desc: '+1 proyectil para todas las armas.', max: 2, apply: p => { p.stats.proj += 1; } },
-    coraza:  { name: 'Coraza de Hierro', icon: '🛡️', desc: '+1 armadura (menos daño recibido).', max: 5, apply: p => { p.stats.armor += 1; } },
+    coraza:  { name: 'Coraza de Hierro', icon: '🛡️', desc: '+1 armadura: cada golpe te quita 1 menos (como mucho, un 70% menos).', max: 5, apply: p => { p.stats.armor += 1; } },
     pergamino: { name: 'Pergamino Sabio', icon: '📜', desc: '+10% de experiencia.',             max: 5, apply: p => { p.stats.xp += 0.10; } },
     capa:    { name: 'Capa Sombría',    icon: '🦇', desc: '+6% de probabilidad de esquivar un golpe.', max: 5, apply: p => { p.stats.dodge += 0.06; } },
-    espinas: { name: 'Cota de Espinas', icon: '🌵', desc: 'Al recibir un golpe, dañas y apartas a los enemigos cercanos.', max: 5, apply: p => { p.stats.thorns += 15; } },
-    colmillo: { name: 'Colmillo Vampírico', icon: '🦷', desc: '+6% de probabilidad de curarte 2 de vida al derrotar a un enemigo cercano.', max: 5, apply: p => { p.stats.leech += 0.06; } },
+    espinas: { name: 'Cota de Espinas', icon: '🌵', desc: 'Al recibir un golpe, dañas y apartas a los enemigos cercanos (más daño cuanto más nivel tengas).', max: 5, apply: p => { p.stats.thorns += 15; } },
+    colmillo: { name: 'Colmillo Vampírico', icon: '🦷', desc: '+10% de probabilidad de curarte 3 de vida al derrotar a un enemigo cercano.', max: 5, apply: p => { p.stats.leech += 0.10; } },
     trebol:  { name: 'Trébol de la Suerte', icon: '🍀', desc: '+25% de monedas, comida e imanes que sueltan los enemigos.', max: 5, apply: p => { p.stats.luck += 0.25; } },
     mana:    { name: 'Cristal de Maná', icon: '🔮', desc: 'Un escudo bloquea un golpe cada pocos segundos (más a menudo con cada nivel).', max: 5, apply: p => { p.stats.mana += 1; } },
   },
@@ -184,10 +184,10 @@ window.HN_DATA = {
     calabaza:   { hp: 22, speed: 84,  dmg: 4,  r: 13, xp: 2, color: '#ff9a3c',
       bomb: { range: 48, fuse: 0.9, R: 72, dmg: 20 } },
     // Lento, enorme y muy resistente; casi no se le puede empujar.
-    golem:      { hp: 200, speed: 30, dmg: 20, r: 24, xp: 10, color: '#9b97ad', heavy: true },
+    golem:      { hp: 200, speed: 30, dmg: 20, r: 24, xp: 14, color: '#9b97ad', heavy: true },
     // Se queda lejos e invoca arañas cada pocos segundos: ve a por él.
     invocador:  { hp: 80, speed: 44,  dmg: 10, r: 15, xp: 6, color: '#5fe0c0',
-      summon: { range: 290, cd: 6, n: 3, type: 'arana' } },
+      summon: { range: 290, cd: 7, n: 2, type: 'arana' } },
   },
 
   // Qué enemigos aparecen y desde qué segundo (con su peso en el sorteo).
@@ -199,7 +199,7 @@ window.HN_DATA = {
   // ai: 'ring' (anillos de proyectiles), 'summon' (invoca crías y lanza telarañas que ralentizan),
   // 'charge' (embiste tras avisar y escupe fuego en abanico), 'king' (anillos y ráfagas dirigidas).
   BOSSES: [
-    { at: 150, name: 'Reina Araña',         hp: 1000,  r: 32, speed: 68, dmg: 18, color: '#cfd2e0', shots: 8,  ai: 'summon', final: false },
+    { at: 150, name: 'Reina Araña',         hp: 1600,  r: 32, speed: 68, dmg: 18, color: '#cfd2e0', shots: 8,  ai: 'summon', final: false },
     { at: 300, name: 'Coloso de Obsidiana', hp: 6000,  r: 38, speed: 52, dmg: 25, color: '#8a5cff', shots: 12, ai: 'ring',   final: false },
     { at: 450, name: 'Dragón de Hueso',     hp: 12000, r: 42, speed: 56, dmg: 30, color: '#ff9a3d', shots: 7,  ai: 'charge', final: false },
     { at: 600, name: 'Rey del Abismo',      hp: 20000, r: 48, speed: 60, dmg: 35, color: '#ff3d7f', shots: 18, ai: 'king',   final: true },
@@ -427,7 +427,19 @@ window.HN_DATA = {
     { id: 'madera', name: 'Cofre de Madera', icon: '📦', price: 200,  rates: { comun: 70, raro: 25, epico: 5,  legendario: 0 } },
     { id: 'plata',  name: 'Cofre de Plata',  icon: '🎁', price: 600,  rates: { comun: 30, raro: 50, epico: 17, legendario: 3 } },
     { id: 'oro',    name: 'Cofre Dorado',    icon: '💰', price: 1500, rates: { comun: 0,  raro: 40, epico: 45, legendario: 15 } },
+    // No se vende: solo se gana al completar una partida en modo Hardcore.
+    { id: 'leyenda', name: 'Cofre Legendario', icon: '👑', price: 0, hardOnly: true, rates: { comun: 0, raro: 0, epico: 0, legendario: 100 } },
   ],
+
+  // Modo Hardcore: enemigos y jefes mucho más duros, sin Renacer, a cambio de mucho más oro
+  // y de cofres mejores (Plata por jefe y el Cofre Legendario al ganar).
+  HARDCORE: { hp: 1.6, dmg: 1.5, rate: 1.3, boss: 1.5, gold: 2.5 },
+  // Cofres que se ganan jugando (en vez de objetos sueltos): probabilidad por jefe derrotado
+  // y cofre seguro al ganar la partida.
+  RUN_CHESTS: {
+    normal: { boss: 'madera', bossChance: 0.25, win: 'madera' },
+    hard:   { boss: 'plata',  bossChance: 0.35, win: 'leyenda' },
+  },
 
   SHOP: [
     { id: 'poder',       name: 'Poder',      icon: '⚔️', desc: '+5% de daño',                  max: 5, cost: 60 },
