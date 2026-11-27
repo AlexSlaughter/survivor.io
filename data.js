@@ -433,7 +433,7 @@ window.HN_DATA = {
 
   // Modo Hardcore: enemigos y jefes mucho más duros, sin Renacer, a cambio de mucho más oro
   // y de cofres mejores (Plata por jefe y el Cofre Legendario al ganar).
-  HARDCORE: { hp: 1.6, dmg: 1.5, rate: 1.3, boss: 1.5, gold: 3 },
+  HARDCORE: { hp: 1.6, dmg: 1.5, rate: 1.3, boss: 1.5, gold: 2.5 },
   // Cofres que se ganan jugando (en vez de objetos sueltos): probabilidad por jefe derrotado
   // y cofre seguro al ganar la partida.
   RUN_CHESTS: {
