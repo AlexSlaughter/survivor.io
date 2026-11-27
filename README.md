@@ -145,7 +145,7 @@ En **📖 Catálogo** puedes ver todos los objetos, también los que aún no tie
 En la pantalla de selección, pulsa **💀 Hardcore** para activarlo (en online lo decide quien crea la sala). Se puede jugar en cualquier mapa y modo.
 
 - Enemigos con **+60% de vida** y **+50% de daño**, un 30% más numerosos, jefes un 50% más duros y **sin Renacer**.
-- Recompensa: **oro ×2,5**, un 35% de **🎁 Cofre de Plata** por cada jefe y, al ganar, un **👑 Cofre Legendario** (100% legendario), que no se puede comprar.
+- Recompensa: **oro ×3** (se multiplica con el del mapa), un 35% de **🎁 Cofre de Plata** por cada jefe y, al ganar, un **👑 Cofre Legendario** (100% legendario), que no se puede comprar.
 - Los mapas ganados en Hardcore muestran 💀.
 
 ### Mapas
