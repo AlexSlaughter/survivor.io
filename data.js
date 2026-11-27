@@ -424,7 +424,7 @@ window.HN_DATA = {
   ITEM_MAX: 5,
   // Cofres de la ruleta: probabilidad (en %) de cada rareza.
   CHESTS: [
-    { id: 'madera', name: 'Cofre de Madera', icon: '📦', price: 200,  rates: { comun: 70, raro: 25, epico: 5,  legendario: 0 } },
+    { id: 'madera', name: 'Cofre de Madera', icon: '📦', price: 200,  rates: { comun: 69.5, raro: 25, epico: 5, legendario: 0.5 } },
     { id: 'plata',  name: 'Cofre de Plata',  icon: '🎁', price: 600,  rates: { comun: 30, raro: 50, epico: 17, legendario: 3 } },
     { id: 'oro',    name: 'Cofre Dorado',    icon: '💰', price: 1500, rates: { comun: 0,  raro: 40, epico: 45, legendario: 15 } },
     // No se vende: solo se gana al completar una partida en modo Hardcore.
