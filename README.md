@@ -122,7 +122,7 @@ En **🎒 Equipo** tienes 5 huecos: **arma**, **casco**, **pecho**, **botas** y 
 
 | Cofre | Precio | Común | Raro | Épico | Legendario |
 |---|---|---|---|---|---|
-| 📦 Madera | 200 | 70% | 25% | 5% | — |
+| 📦 Madera | 200 | 69,5% | 25% | 5% | 0,5% |
 | 🎁 Plata | 600 | 30% | 50% | 17% | 3% |
 | 💰 Dorado | 1500 | — | 40% | 45% | 15% |
 | 👑 Legendario | Solo en Hardcore | — | — | — | 100% |
