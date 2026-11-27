@@ -1453,7 +1453,7 @@
       G.shake = 8;
       burst(p.x, p.y, '#ffd75e', 40, 260);
       sfx('evolve');
-      toast(`${ptag(p)}¡EVOLUCIÓN! ${WEAPONS[ev.id].icon} ${WEAPONS[ev.id].evoName}`);
+      chestNotice(p, 'evo', WEAPONS[ev.id].icon, WEAPONS[ev.id].evoName, `¡${WEAPONS[ev.id].name} ha evolucionado!${gt}`);
       return;
     }
     sfx('chest');
@@ -1463,11 +1463,32 @@
     if (ups.length) {
       const o = pick(ups), d = describe(p, o);
       applyOption(p, o);
-      toast(`${ptag(p)}Cofre: ${d.icon} ${d.title} ${d.lvl}${gt}`);
+      chestNotice(p, 'up', d.icon, `${d.title} · ${d.lvl}`, d.desc + gt);
     } else {
       heal(p, 50);
-      toast(`${ptag(p)}Cofre: +50 de vida${gt}`);
+      chestNotice(p, 'heal', '🍖', '+50 de vida', 'Ya lo tienes todo al máximo' + gt);
     }
+  }
+
+  // Aviso grande (sin pausar) con lo que ha dado un cofre de la partida. En online se envía a los invitados.
+  function chestNotice(p, kind, icon, title, sub, localOnly) {
+    const who = typeof p === 'string' ? p : G.coop ? ((G.names && G.names[p.idx]) || pname(p)) : '';
+    if (!localOnly) netOut(['C', kind, icon, title, sub, who]);
+    const box = $('chestPops');
+    while (box.children.length >= 3) box.firstChild.remove();
+    const c = document.createElement('div');
+    c.className = 'chest-pop k-' + kind;
+    const head = document.createElement('div');
+    head.className = 'cp-head';
+    head.textContent = (kind === 'evo' ? '✨ ¡EVOLUCIÓN!' : '🎁 Cofre') + (who ? ' · ' + who : '');
+    const ic = document.createElement('div'); ic.className = 'cp-ic'; ic.textContent = icon;
+    const tt = document.createElement('div'); tt.className = 'cp-tt'; tt.textContent = title;
+    const sb = document.createElement('div'); sb.className = 'cp-sb'; sb.textContent = sub;
+    const txt = document.createElement('div'); txt.append(head, tt, sb);
+    c.append(ic, txt);
+    box.appendChild(c);
+    setTimeout(() => c.classList.add('out'), kind === 'evo' ? 3400 : 2600);
+    setTimeout(() => c.remove(), kind === 'evo' ? 3800 : 3000);
   }
 
   // ---------- Aparición de enemigos ----------
@@ -5830,6 +5851,7 @@
       case 't': addText(ev[1], ev[2], ev[3], ev[4]); break;
       case 'b': burst(ev[1], ev[2], ev[3], ev[4], ev[5]); break;
       case 'm': toast(ev[1]); break;
+      case 'C': chestNotice(ev[5], ev[1], ev[2], ev[3], ev[4], true); break;
       case 'd': deathAlert(ev[1], ev[2], true); break;
       case 'z': G.effects.push({ type: 'bolt', x: ev[1], y: ev[2], R: ev[3], life: 0.3, max: 0.3, seed: ev[4], ev: !!ev[5] }); break;
       case 'k': G.effects.push({ type: 'slash', x: ev[1], y: ev[2], a: ev[3], R: ev[4], arc: ev[5], color: ev[6], life: 0.22, max: 0.22 }); break;
