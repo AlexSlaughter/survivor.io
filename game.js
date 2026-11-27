@@ -4,7 +4,7 @@
  * HTML5 Canvas + JavaScript puro, sin dependencias.
  */
 (() => {
-  const { WEAPONS, MAIN_WEAPONS, PASSIVES, ETYPES, SPAWNS, BOSSES, CHARS, MAPS, SHOP, RARITY, EQUIP_SLOTS, ITEMS, STAT_LABELS, ITEM_MAX, CHESTS } = window.HN_DATA;
+  const { WEAPONS, MAIN_WEAPONS, PASSIVES, ETYPES, SPAWNS, BOSSES, CHARS, MAPS, SHOP, RARITY, EQUIP_SLOTS, ITEMS, STAT_LABELS, ITEM_MAX, CHESTS, HARDCORE, RUN_CHESTS } = window.HN_DATA;
   // Las armas principales se tratan como armas (suben de nivel en partida), pero no salen como armas nuevas ni evolucionan.
   for (const k in MAIN_WEAPONS) WEAPONS[k] = Object.assign({ main: true }, MAIN_WEAPONS[k]);
   const itemById = id => ITEMS.find(it => it.id === id);
@@ -79,7 +79,7 @@
     return { gold, names };
   }
 
-  const defaultSave = () => ({ gold: 0, up: {}, chars: ['marc'], char: 'marc', map: 'bosque', best: {}, wins: {}, sfx: true, music: true, t: 0, mode: 'solo', char2: 'marc', items: {}, equip: {}, comp1: true });
+  const defaultSave = () => ({ gold: 0, up: {}, chars: ['marc'], char: 'marc', map: 'bosque', best: {}, wins: {}, sfx: true, music: true, t: 0, mode: 'solo', char2: 'marc', items: {}, equip: {}, comp1: true, hard: false, chests: {}, hwins: {} });
   function loadSave() {
     let s = null;
     try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* sin almacenamiento */ }
@@ -116,7 +116,11 @@
       const b = +(o.best && o.best[m.id]) || 0, w = Math.floor(+(o.wins && o.wins[m.id]) || 0);
       if (b > 0) d.best[m.id] = b;
       if (w > 0) d.wins[m.id] = w;
+      const hw = Math.floor(+(o.hwins && o.hwins[m.id]) || 0);
+      if (hw > 0) d.hwins[m.id] = hw;
     }
+    d.hard = o.hard === true;
+    d.chests = sanitizeChests(o.chests);
     if (d.chars.includes(o.char)) d.char = o.char;
     if (d.chars.includes(o.char2)) d.char2 = o.char2;
     d.mode = ['solo', 'local', 'online'].includes(o.mode) ? o.mode : (o.coop === true ? 'local' : 'solo');
@@ -148,6 +152,13 @@
     return out;
   }
 
+  // Cofres guardados (ganados jugando) sin abrir: entre 0 y 99 de cada tipo.
+  function sanitizeChests(c) {
+    const out = {};
+    for (const ch of CHESTS) { const n = Math.floor(+(c && c[ch.id]) || 0); if (n > 0) out[ch.id] = Math.min(99, n); }
+    return out;
+  }
+
   function mergeSaves(a, b) {
     const ta = a.t || 0, tb = b.t || 0;
     // Con la misma fecha (p. ej. guardados sin fecha) se conserva el que tenga más oro.
@@ -157,12 +168,17 @@
     m.up = {};
     for (const it of SHOP) { const l = Math.max(a.up[it.id] || 0, b.up[it.id] || 0); if (l) m.up[it.id] = l; }
     m.chars = CHARS.map(c => c.id).filter(id => a.chars.includes(id) || b.chars.includes(id));
-    m.best = {}; m.wins = {};
+    m.best = {}; m.wins = {}; m.hwins = {};
     for (const mp of MAPS) {
       const bt = Math.max(a.best[mp.id] || 0, b.best[mp.id] || 0), w = Math.max(a.wins[mp.id] || 0, b.wins[mp.id] || 0);
+      const hw = Math.max((a.hwins || {})[mp.id] || 0, (b.hwins || {})[mp.id] || 0);
       if (bt) m.best[mp.id] = bt;
       if (w) m.wins[mp.id] = w;
+      if (hw) m.hwins[mp.id] = hw;
     }
+    // Los cofres sin abrir, como el oro, se toman del guardado más reciente.
+    m.chests = sanitizeChests(newer.chests);
+    m.hard = !!newer.hard;
     m.t = Math.max(a.t || 0, b.t || 0);
     m.items = {};
     for (const it of ITEMS) { const l = Math.max(a.items[it.id] || 0, b.items[it.id] || 0); if (l) m.items[it.id] = l; }
@@ -309,7 +325,13 @@
       eid: 0, netEvents: [], netT: 0,
       enemies: [], bullets: [], ebullets: [], gems: [], pickups: [], particles: [], texts: [], effects: [],
       ults: [], slowmo: 0, cutin: null,
+      hard: online ? !!online.hard : !!S.hard, dmgMul: 1,
     };
+    if (G.hard) {
+      // Hardcore: más vida, más daño, más enemigos, jefes más duros y sin Renacer.
+      G.diffHp *= HARDCORE.hp; G.diffRate *= HARDCORE.rate; G.diffBoss *= HARDCORE.boss; G.dmgMul = HARDCORE.dmg;
+      for (const p of players) p.revives = 0;
+    }
     for (const p of players) addWeapon(p, p.startWeapon, p.startWeaponLvl);
   }
 
@@ -553,7 +575,7 @@
     // Colmillo Vampírico: cura a quien esté cerca.
     for (const p of G.players) {
       if (p.down || !p.stats.leech || dist2(p.x, p.y, e.x, e.y) > 450 * 450) continue;
-      if (Math.random() < p.stats.leech) p.hp = Math.min(p.maxHp, p.hp + 2);
+      if (Math.random() < p.stats.leech) p.hp = Math.min(p.maxHp, p.hp + 3);
     }
     if (e.boss) {
       // Si quedaba otro jefe vivo, su barra sigue en pantalla.
@@ -611,12 +633,15 @@
     if (st.thorns) {
       query(p.x, p.y, 110, e => {
         const kx = e.x - p.x, ky = e.y - p.y, l = Math.hypot(kx, ky) || 1;
-        hurt(e, st.thorns * st.dmg, kx / l, ky / l, 260);
+        // Escala con el nivel del jugador para no quedarse corta cuando los enemigos ganan vida.
+        hurt(e, st.thorns * st.dmg * (1 + 0.08 * p.level), kx / l, ky / l, 260);
       });
       G.effects.push({ type: 'ring', x: p.x, y: p.y, R: 110, color: '#7bc96f', life: 0.4, max: 0.4 });
       netOut(['r', Math.round(p.x), Math.round(p.y), 110, '#7bc96f']);
     }
-    const dmg = Math.max(1, d - p.stats.armor);
+    // Modo Hardcore: todo pega más. La armadura resta daño, pero cada golpe hace al menos el 30%.
+    d *= G.dmgMul || 1;
+    const dmg = Math.max(1, d * 0.3, d - p.stats.armor);
     p.hp -= dmg; p.inv = 0.5;
     G.shake = Math.max(G.shake, 6);
     addText(p.x, p.y - 26, '-' + Math.round(dmg), '#ff5c6c');
@@ -1054,7 +1079,7 @@
       const tg = nearest(p.x, p.y, 1, R + 20)[0];
       if (!tg) { w.t = 0.12; return; }
       w.t = (1.35 - lv * 0.07 - (lv >= 4 ? 0.1 : 0)) * s.cd * (ev ? 0.85 : 1);
-      const dmg = (14 + 6 * lv) * (ev ? 1.6 : 1) * s.dmg, a0 = aimAt(p, tg);
+      const dmg = (16 + 7 * lv) * (ev ? 1.8 : 1) * s.dmg, a0 = aimAt(p, tg);
       const dirs = ev || lv >= 3 ? [a0, a0 + Math.PI] : [a0];
       let healed = 0;
       for (const a of dirs) {
@@ -1112,8 +1137,8 @@
       if (!ts.length) { w.t = 0.3; return; }
       w.t = (2.6 - lv * 0.12) * s.cd * (ev ? 0.8 : 1);
       const n = (ev ? 3 : [1, 1, 1, 2, 2][lv - 1]) + s.proj;
-      const R = (38 + 4 * lv + (lv >= 3 ? 8 : 0) + (lv >= 5 ? 6 : 0)) * s.area * (ev ? 1.5 : 1);
-      const dmg = (5 + 3 * lv) * (ev ? 1.6 : 1) * s.dmg;
+      const R = (38 + 4 * lv + (lv >= 3 ? 8 : 0) + (lv >= 5 ? 6 : 0)) * s.area * (ev ? 1.3 : 1);
+      const dmg = (4 + 2.5 * lv) * (ev ? 1.4 : 1) * s.dmg;
       for (let i = 0; i < n; i++) {
         const t = ts[i % ts.length];
         G.bullets.push({ kind: 'charco', x: t.x + rand(-20, 20), y: t.y + rand(-20, 20), vx: 0, vy: 0, r: R, dmg, life: 3 + (lv >= 3 ? 1 : 0) + (ev ? 1 : 0), tick: 0, ev });
@@ -1130,9 +1155,9 @@
       const lv = w.lvl, ev = w.evolved;
       const first = nearest(p.x, p.y, 1, 420)[0];
       if (!first) { w.t = 0.2; return; }
-      w.t = (1.8 - 0.1 * lv - (lv >= 5 ? 0.15 : 0)) * s.cd * (ev ? 0.75 : 1);
+      w.t = (1.8 - 0.1 * lv - (lv >= 5 ? 0.15 : 0)) * s.cd * (ev ? 0.65 : 1);
       const jumps = (ev ? 8 : [3, 4, 4, 5, 5][lv - 1]) + s.proj;
-      const dmg = (11 + 5 * lv + (lv >= 3 ? 4 : 0)) * (ev ? 1.5 : 1) * s.dmg, hop = (150 + (lv >= 3 ? 40 : 0)) * Math.sqrt(s.area);
+      const dmg = (14 + 6 * lv + (lv >= 3 ? 5 : 0)) * (ev ? 1.8 : 1) * s.dmg, hop = (150 + (lv >= 3 ? 40 : 0)) * Math.sqrt(s.area);
       const hit = new Set(), pts = [Math.round(p.x), Math.round(p.y)];
       let cur = first;
       for (let i = 0; i < jumps && cur; i++) {
@@ -1176,7 +1201,7 @@
       w.t = (2.4 - 0.1 * lv - (lv >= 5 ? 0.25 : 0)) * s.cd * (ev ? 0.7 : 1);
       const n = (ev ? 3 : [1, 1, 1, 2, 2][lv - 1]) + s.proj;
       const R = (60 + 5 * lv + (lv >= 3 ? 15 : 0)) * s.area * (ev ? 1.3 : 1);
-      const dmg = (24 + 9 * lv) * (ev ? 1.4 : 1) * s.dmg;
+      const dmg = (18 + 7 * lv) * (ev ? 1.25 : 1) * s.dmg;
       for (let i = 0; i < n; i++) {
         const a = rand(0, TAU), d = rand(25, 90);
         G.bullets.push({
@@ -1191,9 +1216,9 @@
       if (w.t > 0) return;
       const lv = w.lvl, ev = w.evolved;
       if (!nearest(p.x, p.y, 1, 500).length) { w.t = 0.2; return; }
-      w.t = (1.7 - 0.08 * lv) * s.cd * (ev ? 0.7 : 1);
+      w.t = (1.45 - 0.07 * lv) * s.cd * (ev ? 0.7 : 1);
       const n = (ev ? 4 : [1, 2, 2, 3, 3][lv - 1]) + s.proj;
-      const dmg = (10 + 4 * lv + (lv >= 3 ? 5 : 0)) * (ev ? 1.6 : 1) * s.dmg;
+      const dmg = (12 + 5 * lv + (lv >= 3 ? 6 : 0)) * (ev ? 1.6 : 1) * s.dmg;
       for (let i = 0; i < n; i++) {
         const a = i / n * TAU + rand(-0.3, 0.3);
         G.bullets.push({
@@ -1211,7 +1236,7 @@
       const R = (110 + 12 * lv + (lv >= 3 ? 15 : 0)) * s.area * (ev ? 1.3 : 1);
       if (!nearest(p.x, p.y, 1, R + 20).length) { w.t = 0.2; return; }
       w.t = (3.2 - 0.15 * lv - (lv >= 2 ? 0.15 : 0) - (lv >= 4 ? 0.15 : 0)) * s.cd * (ev ? 0.75 : 1);
-      const dmg = (16 + 7 * lv) * (ev ? 1.5 : 1) * s.dmg;
+      const dmg = (10 + 5 * lv) * (ev ? 1.5 : 1) * s.dmg;
       query(p.x, p.y, R, e => {
         const kx = e.x - p.x, ky = e.y - p.y, l = Math.hypot(kx, ky) || 1;
         hurt(e, dmg, kx / l, ky / l, 260);
@@ -1428,7 +1453,7 @@
       G.shake = 8;
       burst(p.x, p.y, '#ffd75e', 40, 260);
       sfx('evolve');
-      toast(`${ptag(p)}¡EVOLUCIÓN! ${WEAPONS[ev.id].icon} ${WEAPONS[ev.id].evoName}`);
+      chestNotice(p, 'evo', WEAPONS[ev.id].icon, WEAPONS[ev.id].evoName, `¡${WEAPONS[ev.id].name} ha evolucionado!${gt}`);
       return;
     }
     sfx('chest');
@@ -1438,11 +1463,32 @@
     if (ups.length) {
       const o = pick(ups), d = describe(p, o);
       applyOption(p, o);
-      toast(`${ptag(p)}Cofre: ${d.icon} ${d.title} ${d.lvl}${gt}`);
+      chestNotice(p, 'up', d.icon, `${d.title} · ${d.lvl}`, d.desc + gt);
     } else {
       heal(p, 50);
-      toast(`${ptag(p)}Cofre: +50 de vida${gt}`);
+      chestNotice(p, 'heal', '🍖', '+50 de vida', 'Ya lo tienes todo al máximo' + gt);
     }
+  }
+
+  // Aviso grande (sin pausar) con lo que ha dado un cofre de la partida. En online se envía a los invitados.
+  function chestNotice(p, kind, icon, title, sub, localOnly) {
+    const who = typeof p === 'string' ? p : G.coop ? ((G.names && G.names[p.idx]) || pname(p)) : '';
+    if (!localOnly) netOut(['C', kind, icon, title, sub, who]);
+    const box = $('chestPops');
+    while (box.children.length >= 3) box.firstChild.remove();
+    const c = document.createElement('div');
+    c.className = 'chest-pop k-' + kind;
+    const head = document.createElement('div');
+    head.className = 'cp-head';
+    head.textContent = (kind === 'evo' ? '✨ ¡EVOLUCIÓN!' : '🎁 Cofre') + (who ? ' · ' + who : '');
+    const ic = document.createElement('div'); ic.className = 'cp-ic'; ic.textContent = icon;
+    const tt = document.createElement('div'); tt.className = 'cp-tt'; tt.textContent = title;
+    const sb = document.createElement('div'); sb.className = 'cp-sb'; sb.textContent = sub;
+    const txt = document.createElement('div'); txt.append(head, tt, sb);
+    c.append(ic, txt);
+    box.appendChild(c);
+    setTimeout(() => c.classList.add('out'), kind === 'evo' ? 3400 : 2600);
+    setTimeout(() => c.remove(), kind === 'evo' ? 3800 : 3000);
   }
 
   // ---------- Aparición de enemigos ----------
@@ -5151,6 +5197,14 @@
     $('onlineBox').classList.toggle('hidden', mode !== 'online');
     $('startBtn').classList.toggle('hidden', mode === 'online');
     $('mapTitle').textContent = mode === 'online' ? 'Elige mapa (lo decide quien crea la sala)' : 'Elige mapa';
+    const hb = $('hardBtn');
+    hb.classList.toggle('on', !!S.hard);
+    hb.textContent = S.hard ? '💀 Hardcore: ACTIVADO' : '💀 Hardcore: desactivado';
+    $('hardInfo').innerHTML = (S.hard
+      ? `Enemigos +${Math.round((HARDCORE.hp - 1) * 100)}% vida y +${Math.round((HARDCORE.dmg - 1) * 100)}% daño, más numerosos, jefes más duros y <b>sin Renacer</b>.`
+      : 'Actívalo para un reto mucho más difícil.') +
+      ` Recompensa: <b>oro ×${HARDCORE.gold}</b>, ${Math.round(RUN_CHESTS.hard.bossChance * 100)}% de 🎁 Cofre de Plata por jefe y <b>👑 Cofre Legendario</b> al ganar.` +
+      (mode === 'online' ? ' En online lo decide quien crea la sala.' : '');
     renderEqNote();
     renderCharGrid('chars', 'char');
     if (mode === 'local') renderCharGrid('chars2', 'char2');
@@ -5171,7 +5225,7 @@
       const diff = m.hp > 1 ? `Enemigos +${Math.round((m.hp - 1) * 100)}% vida · Oro ×${m.gold}` : 'Dificultad normal · Oro ×1';
       b.innerHTML =
         `<div class="nm">${m.name}</div><div class="ds">${m.desc}</div><div class="wp">${diff}</div>` +
-        (open ? `<div class="tt">${best ? `Mejor: ${fmtTime(best)}${S.wins[m.id] ? ' 👑' : ''}` : 'Sin jugar'}</div>` : `<div class="cost no">${req}</div>`);
+        (open ? `<div class="tt">${best ? `Mejor: ${fmtTime(best)}${S.wins[m.id] ? ' 👑' : ''}${(S.hwins || {})[m.id] ? ' 💀' : ''}` : 'Sin jugar'}</div>` : `<div class="cost no">${req}</div>`);
       b.prepend(mapPreview(m));
       b.addEventListener('click', () => {
         if (!open) { bump(b); return; }
@@ -5244,6 +5298,9 @@
     $('eqSummary').innerHTML = (g.weapon ? `Ataque principal: <b>${WEAPONS[g.weapon].icon} ${WEAPONS[g.weapon].name}</b><br>` : `Sin arma equipada: ataque principal <b>${WEAPONS.basico.icon} ${WEAPONS.basico.name}</b> (el básico).<br>`) +
       (total ? `Bonificaciones: ${total}` : 'Sin bonificaciones de equipo.');
     document.querySelectorAll('#eqTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === eqTab));
+    // Aviso de cofres ganados sin abrir en la pestaña de cofres.
+    const pend = Object.values(S.chests || {}).reduce((x, n) => x + n, 0);
+    document.querySelector('#eqTabs button[data-t="chests"]').textContent = '🎰 Cofres' + (pend ? ` (${pend} 🎁)` : '');
 
     const box = $('eqList');
     box.innerHTML = '';
@@ -5288,7 +5345,7 @@
         `<div class="st">${fmtStats(it.stats, Math.max(1, lvl))}</div>`;
       if (catalog) {
         // Catálogo: solo información, también de lo que aún no tienes.
-        const chests = 'Sale en ' + CHESTS.filter(c => c.rates[it.rarity] > 0).map(c => c.icon).join(' ') + ' y como botín';
+        const chests = 'Sale en ' + CHESTS.filter(c => c.rates[it.rarity] > 0).map(c => c.icon).join(' ');
         if (!lvl) d.classList.add('missing');
         d.insertAdjacentHTML('beforeend', lvl
           ? `<div class="own">✔ Lo tienes · Nv. ${lvl}${on ? ' · equipado' : ''}</div>`
@@ -5334,12 +5391,25 @@
       d.className = 'sel chest';
       d.innerHTML = `<div class="cic">${ch.icon}</div><div class="nm">${ch.name}</div><div class="rates">` +
         Object.keys(ch.rates).filter(r => ch.rates[r] > 0).map(r => `<span style="color:${RARITY[r].color}">${RARITY[r].name} ${ch.rates[r]}%</span>`).join('') + '</div>';
-      const b = document.createElement('button');
-      b.className = 'primary';
-      b.textContent = `Abrir · 🪙 ${ch.price}`;
-      if (S.gold < ch.price) b.style.opacity = '.6';
-      b.addEventListener('click', () => openChestRoulette(ch, d));
-      d.appendChild(b);
+      const own = (S.chests || {})[ch.id] || 0;
+      if (own) {
+        // Cofres ganados jugando: se abren gratis.
+        const f = document.createElement('button');
+        f.className = 'primary';
+        f.textContent = `🎁 Abrir gratis (tienes ${own})`;
+        f.addEventListener('click', () => openChestRoulette(ch, d, true));
+        d.appendChild(f);
+      }
+      if (ch.hardOnly) {
+        if (!own) d.insertAdjacentHTML('beforeend', '<div class="cost no">🔒 Se gana al completar una partida en 💀 Hardcore</div>');
+      } else {
+        const b = document.createElement('button');
+        if (!own) b.className = 'primary';
+        b.textContent = `Abrir · 🪙 ${ch.price}`;
+        if (S.gold < ch.price) b.style.opacity = '.6';
+        b.addEventListener('click', () => openChestRoulette(ch, d));
+        d.appendChild(b);
+      }
       box.appendChild(d);
     }
     const note = document.createElement('p');
@@ -5376,20 +5446,23 @@
   // ---------- Ruleta ----------
   const ROU_CELL = 98, ROU_N = 42, ROU_WIN = 36;
   let rou = null;
-  function openChestRoulette(ch, card) {
+  function openChestRoulette(ch, card, free) {
     if (rou && !rou.done) return;
-    if (S.gold < ch.price) { bump(card); eqMsg('No tienes oro suficiente para este cofre.', true); return; }
+    S.chests = S.chests || {};
+    if (free && !S.chests[ch.id]) { bump(card); eqMsg('No te quedan cofres de este tipo.', true); return; }
+    if (!free && (ch.hardOnly || S.gold < ch.price)) { bump(card); eqMsg('No tienes oro suficiente para este cofre.', true); return; }
     Sound.init();
     // El resultado se decide y se guarda antes de la animación: cerrar a medias no pierde nada.
-    S.gold -= ch.price;
+    if (free) { if (--S.chests[ch.id] <= 0) delete S.chests[ch.id]; } else S.gold -= ch.price;
     const it = rollItem(ch.rates), res = grantItem(it);
     save();
     refreshGold();
-    rou = { ch, it, res, done: false };
+    rou = { ch, it, res, done: false, free };
+    hideLootPop();
     $('rouTitle').textContent = `${ch.icon} ${ch.name}`;
     $('rouResult').innerHTML = '';
     $('rouAgain').disabled = true;
-    $('rouAgain').textContent = `Abrir otro · 🪙 ${ch.price}`;
+    $('rouAgain').textContent = rouAgainLabel(ch);
     const strip = $('rouStrip');
     strip.innerHTML = '';
     for (let i = 0; i < ROU_N; i++) {
@@ -5423,6 +5496,41 @@
     strip.addEventListener('transitionend', revealRoulette, { once: true });
   }
 
+  // Popup grande con el objeto que ha tocado: rareza, qué ha pasado y botón para equiparlo.
+  function showLootPop(it, res, status) {
+    const rar = RARITY[it.rarity], pop = $('rouPop'), card = $('rouPopCard');
+    const lvl = Math.max(1, S.items[it.id] || 1), slot = EQUIP_SLOTS.find(sl => sl.id === it.slot);
+    const cur = itemById(S.equip[it.slot]), canEquip = res.kind !== 'gold' && S.equip[it.slot] !== it.id;
+    pop.className = 'loot-pop r-' + it.rarity;
+    pop.style.setProperty('--rc', rar.color);
+    card.innerHTML =
+      `<div class="lp-rar">${rar.name}</div>` +
+      `<div class="lp-ic">${it.icon}</div>` +
+      `<div class="lp-nm">${it.name}</div>` +
+      `<div class="lp-st">${res.kind === 'new' ? '✨ ' : res.kind === 'up' ? '⬆️ ' : '🪙 '}${status}</div>` +
+      `<div class="lp-info">${slot.icon} ${slot.name} · Nv. ${lvl}` + (it.ref ? ` · 🎮 ${it.ref}` : '') + '</div>' +
+      `<div class="lp-stats">${fmtStats(it.stats, lvl)}</div>` +
+      (it.weapon ? `<div class="lp-info">Ataque principal: ${WEAPONS[it.weapon].desc}</div>` : '') +
+      (canEquip && cur ? `<div class="lp-info">Llevas puesto: ${cur.icon} ${cur.name} (Nv. ${S.items[cur.id]})</div>` : '') +
+      '<div class="actions"></div>';
+    const acts = card.querySelector('.actions');
+    const btn = (txt, cls, fn) => {
+      const b = document.createElement('button');
+      b.textContent = txt; if (cls) b.className = cls;
+      b.addEventListener('click', () => { Sound.play('click'); fn(); });
+      acts.appendChild(b);
+    };
+    if (canEquip) btn('Equipar', '', () => { S.equip[it.slot] = it.id; save(); hideLootPop(); });
+    btn('¡Genial!', 'primary', hideLootPop);
+  }
+  function hideLootPop() { $('rouPop').classList.add('hidden'); }
+  $('rouPop').addEventListener('click', e => { if (e.target === $('rouPop')) hideLootPop(); });
+
+  // «Abrir otro»: gratis mientras queden cofres ganados de ese tipo; si no, con oro.
+  const rouAgainLabel = ch => {
+    const left = (S.chests || {})[ch.id] || 0;
+    return left ? `🎁 Abrir otro gratis (quedan ${left})` : ch.hardOnly ? 'No te quedan más' : `Abrir otro · 🪙 ${ch.price}`;
+  };
   function revealRoulette() {
     if (!rou || rou.done) return;
     rou.done = true;
@@ -5441,8 +5549,11 @@
       (it.ref ? `<div class="rs ref">🎮 ${it.ref}</div>` : '') +
       `<div class="rs">${fmtStats(it.stats, Math.max(1, S.items[it.id] || 1))}${it.weapon ? `<br>Ataque principal: ${WEAPONS[it.weapon].desc}` : ''}</div>`;
     Sound.play(it.rarity === 'legendario' || it.rarity === 'epico' ? 'evolve' : 'chest');
-    $('rouAgain').disabled = false;
-    $('rouAgain').style.opacity = S.gold >= ch.price ? '' : '.6';
+    showLootPop(it, res, status);
+    const left = (S.chests || {})[ch.id] || 0;
+    $('rouAgain').textContent = rouAgainLabel(ch);
+    $('rouAgain').disabled = !left && !!ch.hardOnly;
+    $('rouAgain').style.opacity = left || S.gold >= ch.price ? '' : '.6';
     refreshGold();
   }
 
@@ -5658,7 +5769,7 @@
     lastOnline = 'guest';
     const n = m.chars.length;
     G = {
-      online: 'guest', localIdx: m.you || 1, coop: true, map: mapById(m.map), names: m.names,
+      online: 'guest', localIdx: m.you || 1, coop: true, map: mapById(m.map), names: m.names, hard: !!m.hard,
       time: 0, kills: 0, gold: 0, shake: 0, boss: null, cx: 0, cy: 0,
       players: m.chars.map((c, i) => viewPlayer(charById(c), i, (i - (n - 1) / 2) * 60)),
       ults: [], cutin: null,
@@ -5740,6 +5851,7 @@
       case 't': addText(ev[1], ev[2], ev[3], ev[4]); break;
       case 'b': burst(ev[1], ev[2], ev[3], ev[4], ev[5]); break;
       case 'm': toast(ev[1]); break;
+      case 'C': chestNotice(ev[5], ev[1], ev[2], ev[3], ev[4], true); break;
       case 'd': deathAlert(ev[1], ev[2], true); break;
       case 'z': G.effects.push({ type: 'bolt', x: ev[1], y: ev[2], R: ev[3], life: 0.3, max: 0.3, seed: ev[4], ev: !!ev[5] }); break;
       case 'k': G.effects.push({ type: 'slash', x: ev[1], y: ev[2], a: ev[3], R: ev[4], arc: ev[5], color: ev[6], life: 0.22, max: 0.22 }); break;
@@ -5809,7 +5921,8 @@
     Sound.stopMusic();
     Sound.play(m.win ? 'win' : 'lose');
     const map = mapById(m.map);
-    const r = recordRun(m.win, m.time, map, m.base, 1 + 0.1 * upLvl('codicia') + (gearStats(myGear()).st.gold || 0), Math.min(BOSSES.length, +m.bossKills || 0));
+    const r = recordRun(m.win, m.time, map, m.base, 1 + 0.1 * upLvl('codicia') + (gearStats(myGear()).st.gold || 0), Math.min(BOSSES.length, +m.bossKills || 0), !!m.hard);
+    r.hard = !!m.hard;
     Object.assign(r, { t: m.time, level: (m.levels && m.levels[G.localIdx]) || m.level || 1, kills: m.kills });
     $('retryBtn').classList.add('hidden');
     showEnd(m.win, m.win ? '¡Victoria!' : 'Habéis caído', '🌐 Online: ' + listNames(G.names) + '<br>', r,
@@ -5965,6 +6078,7 @@
       ups: [S.up, ...rs.map(r => r.up)],
       gears: [myGear(), ...rs.map(r => r.gear)],
       names: [myName(), ...rs.map(r => r.name)],
+      hard: !!S.hard,
       views: Object.fromEntries(slots.map(k => [k, { vw: lobby.remotes[k].vw, vh: lobby.remotes[k].vh }])),
     };
     Sound.init();
@@ -5972,7 +6086,7 @@
     G.slotOf = [null, ...slots];
     G.idxOf = Object.fromEntries(slots.map((k, i) => [k, i + 1]));
     lastOnline = 'host';
-    slots.forEach((k, i) => Net.sendTo(k, { t: 'start', map: online.map, chars: online.chars, names: online.names, you: i + 1 }));
+    slots.forEach((k, i) => Net.sendTo(k, { t: 'start', map: online.map, chars: online.chars, names: online.names, you: i + 1, hard: online.hard }));
     beginPlay();
     toast(`🌐 Jugando con ${listNames(rs.map(r => r.name))}` + (isTouch ? ' · arrastra el dedo para moverte' : ''), true);
   }
@@ -6034,7 +6148,8 @@
     Sound.init();
     newGame();
     beginPlay();
-    if (G.coop) toast(isTouch ? (splitSide() ? 'J1: mitad izquierda · J2: mitad derecha' : 'J1: mitad de arriba · J2: mitad de abajo') : 'J1: WASD · J2: flechas (o un mando cada uno)', true);
+    if (G.hard) toast('💀 Modo Hardcore: sin Renacer y enemigos mucho más duros. ¡Suerte!', true);
+    else if (G.coop) toast(isTouch ? (splitSide() ? 'J1: mitad izquierda · J2: mitad derecha' : 'J1: mitad de arriba · J2: mitad de abajo') : 'J1: WASD · J2: flechas (o un mando cada uno)', true);
     else if (isTouch) toast('Arrastra el dedo para moverte', true);
   }
 
@@ -6130,28 +6245,27 @@
 
   // Guarda el resultado de una partida en el progreso de esta cuenta.
   // Botín: cada jefe derrotado (hay 4) da un 30% de conseguir un objeto nuevo (o subir uno que ya tienes).
-  function rollLoot(bossKills, win) {
-    const got = [];
-    for (let i = 0; i < bossKills; i++) {
-      if (Math.random() >= 0.3) continue;
-      const pool = ITEMS.filter(it => it.rarity !== 'legendario' || win);
-      const total = pool.reduce((a, it) => a + RARITY[it.rarity].w, 0);
-      let r = Math.random() * total, it = pool[0];
-      for (const c of pool) { r -= RARITY[c.rarity].w; if (r <= 0) { it = c; break; } }
-      const res = grantItem(it);
-      got.push({ it, up: res.kind === 'up', gold: res.gold });
-    }
-    return got;
+  // Botín de la partida: ya no da objetos sueltos, sino cofres que se abren en Equipo → Cofres.
+  function rollChests(bossKills, win, hard) {
+    const R = hard ? RUN_CHESTS.hard : RUN_CHESTS.normal, got = [];
+    // El jefe final cuenta para la victoria, no para la probabilidad de cofre.
+    const kills = win ? Math.max(0, bossKills - 1) : bossKills;
+    for (let i = 0; i < kills; i++) if (Math.random() < R.bossChance) got.push(R.boss);
+    if (win) got.push(R.win);
+    S.chests = S.chests || {};
+    for (const id of got) S.chests[id] = Math.min(99, (S.chests[id] || 0) + 1);
+    return got.map(id => CHESTS.find(c => c.id === id));
   }
 
-  function recordRun(win, t, map, base, goldMult, bossKills = 0) {
+  function recordRun(win, t, map, base, goldMult, bossKills = 0, hard = false) {
     const lockedBefore = MAPS.filter(m => !mapUnlocked(m)).map(m => m.id);
     let record = false;
     if (t > (S.best[map.id] || 0)) { S.best[map.id] = t; record = true; }
     if (win) S.wins[map.id] = (S.wins[map.id] || 0) + 1;
-    const earned = Math.round(base * map.gold * goldMult);
+    if (win && hard) { S.hwins = S.hwins || {}; S.hwins[map.id] = (S.hwins[map.id] || 0) + 1; }
+    const earned = Math.round(base * map.gold * goldMult * (hard ? HARDCORE.gold : 1));
     S.gold += earned;
-    const loot = rollLoot(bossKills, win);
+    const loot = rollChests(bossKills, win, hard);
     save();
     return { earned, record, loot, newMaps: MAPS.filter(m => lockedBefore.includes(m.id) && mapUnlocked(m)) };
   }
@@ -6164,7 +6278,9 @@
       `Tiempo: <b>${fmtTime(r.t)}</b>${r.record ? ' 🏆' : ''}<br>Nivel: <b>${r.level}</b> · Enemigos: <b>${r.kills}</b><br>` +
       `Oro ganado: <b>🪙 ${r.earned}</b> (total ${S.gold})` +
       r.newMaps.map(m => `<br><span class="unlock">¡Nuevo mapa desbloqueado: ${m.emoji} ${m.name}!</span>`).join('') +
-      (r.loot || []).map(l => `<br><span class="unlock">🎁 Botín: <span style="color:${RARITY[l.it.rarity].color}">${l.it.icon} ${l.it.name}</span>${l.up ? ' (sube de nivel)' : l.gold ? ` (ya al máximo: +${l.gold} 🪙)` : ''}</span>`).join('') +
+      (r.hard ? `<br><span class="unlock">💀 Hardcore: oro ×${HARDCORE.gold}</span>` : '') +
+      (r.loot || []).map(c => `<br><span class="unlock">🎁 Has ganado: ${c.icon} ${c.name}</span>`).join('') +
+      ((r.loot || []).length ? '<br><span class="sub">Ábrelos gratis en 🎒 Equipo → Cofres.</span>' : '') +
       (extra || '');
     $('pauseBtn').classList.add('hidden');
     showOnly('end');
@@ -6178,8 +6294,9 @@
     Sound.play(win ? 'win' : 'lose');
     const t = G.time, map = G.map;
     const base = G.gold + Math.floor(t / 10) + G.bossKills * 50 + (win ? 150 : 0);
-    const r = recordRun(win, t, map, base, G.players[0].stats.gold, G.bossKills);
-    if (G.online === 'host') Net.send({ t: 'end', win, time: t, levels: G.players.map(p => p.level), kills: G.kills, base, map: map.id, bossKills: G.bossKills });
+    const r = recordRun(win, t, map, base, G.players[0].stats.gold, G.bossKills, G.hard);
+    r.hard = G.hard;
+    if (G.online === 'host') Net.send({ t: 'end', win, time: t, levels: G.players.map(p => p.level), kills: G.kills, base, map: map.id, bossKills: G.bossKills, hard: G.hard });
     Object.assign(r, { t, level: G.coop ? G.players.map(p => p.level).join(' / ') : G.p.level, kills: G.kills });
     const who = G.online ? '🌐 Online: ' + listNames(G.names) + '<br>'
       : G.coop ? '👥 Cooperativo: ' + G.players.map(p => esc(p.ch.name)).join(' y ') + '<br>' : '';
@@ -6192,8 +6309,8 @@
   click('shopBtn', () => { renderShop(); showOnly('shop'); });
   click('equipBtn', () => openEquip('menu'));
   $('rouWin').addEventListener('click', revealRoulette);
-  click('rouBack', () => { revealRoulette(); eqTab = 'chests'; eqMsg(''); renderEquip(); showOnly('equip'); });
-  click('rouAgain', () => { if (rou) openChestRoulette(rou.ch, $('rouAgain')); });
+  click('rouBack', () => { revealRoulette(); hideLootPop(); eqTab = 'chests'; eqMsg(''); renderEquip(); showOnly('equip'); });
+  click('rouAgain', () => { if (rou) openChestRoulette(rou.ch, $('rouAgain'), !!(S.chests || {})[rou.ch.id]); });
   click('eqBack', () => { if (eqReturn === 'select') { renderSelect(); showOnly('select'); } else openMenu(); });
   document.querySelectorAll('#eqTabs button').forEach(b => b.addEventListener('click', () => {
     Sound.play('click'); eqTab = b.dataset.t; eqMsg(''); renderEquip();
@@ -6205,6 +6322,7 @@
   }));
   click('accountBtn', () => { setMsg(''); renderAccount(); showOnly('account'); });
   click('startBtn', start);
+  click('hardBtn', () => { S.hard = !S.hard; save(); renderSelect(); });
   click('retryBtn', retry);
   click('hostBtn', hostRoom);
   click('joinBtn', joinRoom);

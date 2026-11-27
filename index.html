@@ -20,6 +20,7 @@
   <button id="pauseBtn" class="hidden" aria-label="Pausa">❚❚</button>
   <div id="toast" class="hidden"></div>
   <div id="deathAlert" class="hidden"></div>
+  <div id="chestPops"></div>
   <div id="countdown" class="hidden" aria-live="assertive"></div>
 
   <!-- Menú principal -->
@@ -116,6 +117,7 @@
         <button data-m="local">👥 2 jugadores (local)</button>
         <button data-m="online">🌐 Online</button>
       </div>
+      <div class="hardRow"><button id="hardBtn" class="hardBtn">💀 Hardcore: desactivado</button><p id="hardInfo" class="sub"></p></div>
       <h2 id="p1Title">Elige personaje</h2>
       <p id="eqNote" class="sub eqnote"></p>
       <div id="chars" class="grid"></div>
@@ -164,6 +166,11 @@
         <button id="rouBack">Volver</button>
         <button id="rouAgain" class="primary">Abrir otro</button>
       </div>
+    </div>
+    <!-- Popup con el objeto que ha tocado -->
+    <div id="rouPop" class="loot-pop hidden">
+      <div class="loot-rays"></div>
+      <div id="rouPopCard" class="loot-card"></div>
     </div>
   </div>
 

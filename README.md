@@ -95,7 +95,9 @@ Daño por segundo aproximado a cada enemigo, sin bonificaciones. Las armas de á
 | 🌀 Cuchillas (cuerpo a cuerpo) | 8 | 38 | 69 | 165 |
 | 🔥 Halo (todo alrededor) | 10 | 22 | 34 | 102 (y ralentiza) |
 
-Los enemigos ganan vida cada vez más rápido (×1,25 al empezar, ×5,4 a los 5 minutos y ×12,5 a los 10) y +10% de daño por minuto. Jefes (vida base): Reina Araña 1000, Coloso de Obsidiana 6000, Dragón de Hueso 12000 y Rey del Abismo 20000; se multiplica entre ×0,9 y ×2,25 según vuestro nivel al llegar (×1,5 con el nivel habitual). Enfurecidos, los jefes brillan en rojo.
+Las armas más nuevas se han reequilibrado para que ninguna destaque demasiado: el 🪨 Pisotón, las 💣 Minas y el 🧪 Frasco hacen menos daño; los 👻 Espíritus, la ⛓️ Cadena y el 🪢 Látigo hacen más. En las pasivas, la 🌵 Cota de Espinas escala con tu nivel, el 🦷 Colmillo cura más a menudo (10% por nivel, 3 de vida) y la 🛡️ armadura ya no anula del todo los golpes: cada golpe hace al menos el 30% de su daño.
+
+Los enemigos ganan vida cada vez más rápido (×1,25 al empezar, ×5,4 a los 5 minutos y ×12,5 a los 10) y +10% de daño por minuto. Jefes (vida base): Reina Araña 1600, Coloso de Obsidiana 6000, Dragón de Hueso 12000 y Rey del Abismo 20000; se multiplica entre ×0,9 y ×2,25 según vuestro nivel al llegar (×1,5 con el nivel habitual). Enfurecidos, los jefes brillan en rojo.
 
 ### Personajes
 
@@ -116,13 +118,14 @@ En **🎒 Equipo** tienes 5 huecos: **arma**, **casco**, **pecho**, **botas** y 
 
 - **El arma equipada es el ataque principal** de cualquier personaje (ver tabla de armas) y además da una pequeña bonificación.
 - Los objetos tienen rareza (**común**, **raro**, **épico** y **legendario**) y se **mejoran con oro** hasta nivel 5. Cada nivel añade un 50% de la bonificación base.
-- **No se compran directamente**: salen en **🎰 cofres con ruleta**, que se compran con oro, o como **🎁 botín** (cada jefe derrotado tiene un 50% de soltar un objeto; los legendarios solo si ganas la partida). Si te toca uno que ya tienes, sube de nivel, y si ya estaba al máximo recibes oro.
+- **No se compran directamente**: salen en **🎰 cofres con ruleta**, que se compran con oro o se **ganan jugando**: cada jefe derrotado tiene un 25% de dar un 📦 Cofre de Madera y ganar la partida da uno seguro. Los cofres ganados se abren gratis en *Equipo → Cofres*. Si te toca un objeto que ya tienes, sube de nivel, y si ya estaba al máximo recibes oro.
 
 | Cofre | Precio | Común | Raro | Épico | Legendario |
 |---|---|---|---|---|---|
-| 📦 Madera | 200 | 70% | 25% | 5% | — |
+| 📦 Madera | 200 | 69,5% | 25% | 5% | 0,5% |
 | 🎁 Plata | 600 | 30% | 50% | 17% | 3% |
 | 💰 Dorado | 1500 | — | 40% | 45% | 15% |
+| 👑 Legendario | Solo en Hardcore | — | — | — | 100% |
 - En cooperativo local el equipo lo lleva J1. En online, cada jugador lleva el suyo.
 
 | Hueco | Objetos |
@@ -136,6 +139,14 @@ En **🎒 Equipo** tienes 5 huecos: **arma**, **casco**, **pecho**, **botas** y 
 **Más beneficios, más rareza:** cada bonificación vale unos puntos (por ejemplo, 10 de vida = 10 puntos; +5% de daño = 10 puntos) y cada rareza tiene su presupuesto: común ~10, raro ~20, épico ~32 y legendario ~48. Con las armas pasa igual con el daño que hacen.
 
 En **📖 Catálogo** puedes ver todos los objetos, también los que aún no tienes, con sus bonificaciones y en qué cofres salen.
+
+### 💀 Modo Hardcore
+
+En la pantalla de selección, pulsa **💀 Hardcore** para activarlo (en online lo decide quien crea la sala). Se puede jugar en cualquier mapa y modo.
+
+- Enemigos con **+60% de vida** y **+50% de daño**, un 30% más numerosos, jefes un 50% más duros y **sin Renacer**.
+- Recompensa: **oro ×2,5** (se multiplica con el del mapa), un 35% de **🎁 Cofre de Plata** por cada jefe y, al ganar, un **👑 Cofre Legendario** (100% legendario), que no se puede comprar.
+- Los mapas ganados en Hardcore muestran 💀.
 
 ### Mapas
 
