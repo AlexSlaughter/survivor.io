@@ -5437,6 +5437,7 @@
     save();
     refreshGold();
     rou = { ch, it, res, done: false, free };
+    hideLootPop();
     $('rouTitle').textContent = `${ch.icon} ${ch.name}`;
     $('rouResult').innerHTML = '';
     $('rouAgain').disabled = true;
@@ -5474,6 +5475,36 @@
     strip.addEventListener('transitionend', revealRoulette, { once: true });
   }
 
+  // Popup grande con el objeto que ha tocado: rareza, qué ha pasado y botón para equiparlo.
+  function showLootPop(it, res, status) {
+    const rar = RARITY[it.rarity], pop = $('rouPop'), card = $('rouPopCard');
+    const lvl = Math.max(1, S.items[it.id] || 1), slot = EQUIP_SLOTS.find(sl => sl.id === it.slot);
+    const cur = itemById(S.equip[it.slot]), canEquip = res.kind !== 'gold' && S.equip[it.slot] !== it.id;
+    pop.className = 'loot-pop r-' + it.rarity;
+    pop.style.setProperty('--rc', rar.color);
+    card.innerHTML =
+      `<div class="lp-rar">${rar.name}</div>` +
+      `<div class="lp-ic">${it.icon}</div>` +
+      `<div class="lp-nm">${it.name}</div>` +
+      `<div class="lp-st">${res.kind === 'new' ? '✨ ' : res.kind === 'up' ? '⬆️ ' : '🪙 '}${status}</div>` +
+      `<div class="lp-info">${slot.icon} ${slot.name} · Nv. ${lvl}` + (it.ref ? ` · 🎮 ${it.ref}` : '') + '</div>' +
+      `<div class="lp-stats">${fmtStats(it.stats, lvl)}</div>` +
+      (it.weapon ? `<div class="lp-info">Ataque principal: ${WEAPONS[it.weapon].desc}</div>` : '') +
+      (canEquip && cur ? `<div class="lp-info">Llevas puesto: ${cur.icon} ${cur.name} (Nv. ${S.items[cur.id]})</div>` : '') +
+      '<div class="actions"></div>';
+    const acts = card.querySelector('.actions');
+    const btn = (txt, cls, fn) => {
+      const b = document.createElement('button');
+      b.textContent = txt; if (cls) b.className = cls;
+      b.addEventListener('click', () => { Sound.play('click'); fn(); });
+      acts.appendChild(b);
+    };
+    if (canEquip) btn('Equipar', '', () => { S.equip[it.slot] = it.id; save(); hideLootPop(); });
+    btn('¡Genial!', 'primary', hideLootPop);
+  }
+  function hideLootPop() { $('rouPop').classList.add('hidden'); }
+  $('rouPop').addEventListener('click', e => { if (e.target === $('rouPop')) hideLootPop(); });
+
   // «Abrir otro»: gratis mientras queden cofres ganados de ese tipo; si no, con oro.
   const rouAgainLabel = ch => {
     const left = (S.chests || {})[ch.id] || 0;
@@ -5497,6 +5528,7 @@
       (it.ref ? `<div class="rs ref">🎮 ${it.ref}</div>` : '') +
       `<div class="rs">${fmtStats(it.stats, Math.max(1, S.items[it.id] || 1))}${it.weapon ? `<br>Ataque principal: ${WEAPONS[it.weapon].desc}` : ''}</div>`;
     Sound.play(it.rarity === 'legendario' || it.rarity === 'epico' ? 'evolve' : 'chest');
+    showLootPop(it, res, status);
     const left = (S.chests || {})[ch.id] || 0;
     $('rouAgain').textContent = rouAgainLabel(ch);
     $('rouAgain').disabled = !left && !!ch.hardOnly;
@@ -6255,7 +6287,7 @@
   click('shopBtn', () => { renderShop(); showOnly('shop'); });
   click('equipBtn', () => openEquip('menu'));
   $('rouWin').addEventListener('click', revealRoulette);
-  click('rouBack', () => { revealRoulette(); eqTab = 'chests'; eqMsg(''); renderEquip(); showOnly('equip'); });
+  click('rouBack', () => { revealRoulette(); hideLootPop(); eqTab = 'chests'; eqMsg(''); renderEquip(); showOnly('equip'); });
   click('rouAgain', () => { if (rou) openChestRoulette(rou.ch, $('rouAgain'), !!(S.chests || {})[rou.ch.id]); });
   click('eqBack', () => { if (eqReturn === 'select') { renderSelect(); showOnly('select'); } else openMenu(); });
   document.querySelectorAll('#eqTabs button').forEach(b => b.addEventListener('click', () => {
